@@ -1,4 +1,6 @@
-import { getCookie } from './cookie';
+import { getCookie, setCookie, removeCookie } from './cookie';
+import { decodeJwt } from './jwt';
+import type { LoginResponse } from '@/types';
 
 export class HttpError extends Error {
   status: number;
@@ -13,6 +15,46 @@ export class HttpError extends Error {
 }
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
+
+const AUTH_PATHS = ['/auth/login', '/auth/refresh'];
+
+let refreshPromise: Promise<LoginResponse> | null = null;
+
+export function saveTokens(data: LoginResponse) {
+  const payload = decodeJwt(data.access_token);
+  const maxAge = payload.exp ? payload.exp - Math.floor(Date.now() / 1000) : undefined;
+
+  setCookie('access_token', data.access_token, { maxAge });
+  setCookie('refresh_token', data.refresh_token, { maxAge });
+}
+
+function clearTokens() {
+  removeCookie('access_token');
+  removeCookie('refresh_token');
+}
+
+async function refreshTokens(): Promise<LoginResponse> {
+  const token = getCookie('refresh_token');
+  if (!token) {
+    throw new HttpError(401, 'No refresh token found');
+  }
+
+  const response = await fetch(`${BASE_URL}/auth/refresh`, {
+    method: 'POST',
+    headers: {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ refresh_token: token }),
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => undefined);
+    throw new HttpError(response.status, 'Token refresh failed', body);
+  }
+
+  return response.json() as Promise<LoginResponse>;
+}
 
 async function request<T>(
   method: string,
@@ -41,6 +83,23 @@ async function request<T>(
   });
 
   if (!response.ok) {
+    if (response.status === 401 && !AUTH_PATHS.includes(path)) {
+      try {
+        // Deduplicate concurrent refresh calls
+        refreshPromise ??= refreshTokens();
+        const data = await refreshPromise;
+        saveTokens(data);
+
+        // Retry the original request with the new token
+        return request<T>(method, path, options);
+      } catch {
+        clearTokens();
+        throw new HttpError(401, 'Session expired');
+      } finally {
+        refreshPromise = null;
+      }
+    }
+
     const body = await response.json().catch(() => undefined);
     throw new HttpError(
       response.status,
