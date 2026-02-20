@@ -1,7 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { login } from "@/services/auth.service"
-import { decodeJwt } from "@/lib/jwt"
-import { setCookie } from "@/lib/cookie"
+import { saveTokens } from "@/lib/http-client"
 import type { LoginPayload } from "@/types"
 
 export const useLogin = () => {
@@ -10,10 +9,7 @@ export const useLogin = () => {
   return useMutation({
     mutationFn: (payload: LoginPayload) => login(payload.email, payload.password),
     onSuccess: (data) => {
-      const payload = decodeJwt(data.access_token)
-      const maxAge = payload.exp ? payload.exp - Math.floor(Date.now() / 1000) : undefined
-
-      setCookie('access_token', data.access_token, { maxAge })
+      saveTokens(data)
       queryClient.setQueryData(['currentUser'], data.user)
     },
   })
