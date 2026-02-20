@@ -1,4 +1,25 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect } from 'react'
+import { Controller, useForm } from 'react-hook-form'
+import { z } from 'zod/v4'
+import { standardSchemaResolver } from '@hookform/resolvers/standard-schema'
+import { Loader2 } from 'lucide-react'
+import { useNavigate } from '@tanstack/react-router'
+
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
+
+import { useLogin } from './hooks/use-login'
+import { cn } from '@/lib/utils'
+
+const formSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8),
+  rememberMe: z.boolean(),
+})
+
+type FormSchema = z.infer<typeof formSchema>
 
 const googleIcon =
   'https://www.figma.com/api/mcp/asset/33c95150-af94-46fd-8817-41c8209ecd8f'
@@ -6,14 +27,41 @@ const githubIcon =
   'https://www.figma.com/api/mcp/asset/b8ad82e8-b936-4dd5-a440-6b5e054fb62f'
 
 export default function LoginForm() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [rememberMe, setRememberMe] = useState(false)
+  const { mutateAsync: login, isPending, isError, reset: resetLogin } = useLogin()
+  const navigate = useNavigate()
+  const {
+    register,
+    handleSubmit,
+    control,
+    formState: { errors },
+    setError,
+    clearErrors,
+  } = useForm<FormSchema>({
+    resolver: standardSchemaResolver(formSchema),
+    defaultValues: {
+      email: '',
+      password: '',
+      rememberMe: false,
+    },
+  })
 
-  const handleSubmit = (e: FormEvent) => {
-    e.preventDefault()
-    console.log({ email, password, rememberMe })
+  async function onSubmit(data: FormSchema) {
+    try {
+      await login({ email: data.email, password: data.password })
+      navigate({ to: '/dashboard' })
+    } catch {
+      // Error is handled via isError state in the useEffect above
+    }
   }
+
+  useEffect(() => {
+    if (isError) {
+      setError('password', { message: "Invalid email or password" })
+    } else {
+      clearErrors('password')
+    }
+  }, [isError, setError, clearErrors])
+
 
   return (
     <div className="flex w-full max-w-[380px] flex-col gap-8 p-12">
@@ -29,28 +77,22 @@ export default function LoginForm() {
 
       {/* Social login */}
       <div className="flex gap-3">
-        <button
-          type="button"
-          className="flex flex-1 cursor-pointer items-center justify-center rounded-lg border border-[#e2e8f0] bg-white px-[17px] py-[11px] shadow-[0_1px_2px_0_rgba(0,0,0,0.05)] transition-colors hover:bg-[#f8fafc]"
-        >
+        <Button type="button" variant="outline" className="flex-1 py-[11px]">
           <img
             src={googleIcon}
             alt="Sign in with Google"
             width={20}
             height={20}
           />
-        </button>
-        <button
-          type="button"
-          className="flex flex-1 cursor-pointer items-center justify-center rounded-lg border border-[#e2e8f0] bg-white px-[17px] py-[11px] shadow-[0_1px_2px_0_rgba(0,0,0,0.05)] transition-colors hover:bg-[#f8fafc]"
-        >
+        </Button>
+        <Button type="button" variant="outline" className="flex-1 py-[11px]">
           <img
             src={githubIcon}
             alt="Sign in with GitHub"
             width={20}
             height={20}
           />
-        </button>
+        </Button>
       </div>
 
       {/* Divider */}
@@ -62,51 +104,52 @@ export default function LoginForm() {
       </div>
 
       {/* Form */}
-      <form className="flex flex-col gap-5" onSubmit={handleSubmit}>
+      <form className="flex flex-col gap-5" onSubmit={handleSubmit(onSubmit)}>
         <div className="flex flex-col gap-2">
-          <label
-            htmlFor="email"
-            className="text-sm font-medium leading-5 text-[#334155]"
-          >
-            Email address
-          </label>
-          <input
+          <Label htmlFor="email">Email address</Label>
+          <Input
             id="email"
             type="email"
-            className="w-full rounded-lg border border-[#cbd5e1] bg-white px-3 py-[15px] font-[inherit] text-sm text-[#0f172a] shadow-[0_1px_2px_0_rgba(0,0,0,0.05)] outline-none transition-[border-color,box-shadow] placeholder:text-[#94a3b8] focus:border-[#6565f1] focus:shadow-[0_0_0_3px_rgba(101,101,241,0.1)]"
             placeholder="name@company.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            {...register('email', { onChange: () => isError && resetLogin() })}
           />
+          {errors.email && (
+            <p className="text-sm text-destructive">{errors.email.message}</p>
+          )}
         </div>
 
         <div className="flex flex-col gap-2">
-          <label
-            htmlFor="password"
-            className="text-sm font-medium leading-5 text-[#334155]"
-          >
-            Password
-          </label>
-          <input
+          <Label htmlFor="password">Password</Label>
+          <Input
             id="password"
             type="password"
-            className="w-full rounded-lg border border-[#cbd5e1] bg-white px-3 py-[15px] font-[inherit] text-sm text-[#0f172a] shadow-[0_1px_2px_0_rgba(0,0,0,0.05)] outline-none transition-[border-color,box-shadow] placeholder:text-[#94a3b8] focus:border-[#6565f1] focus:shadow-[0_0_0_3px_rgba(101,101,241,0.1)]"
             placeholder="••••••••"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            {...register('password', { onChange: () => isError && resetLogin() })}
           />
+          {errors.password && (
+            <p className="text-sm text-destructive">
+              {errors.password.message}
+            </p>
+          )}
         </div>
 
         <div className="flex items-center justify-between">
-          <label className="flex cursor-pointer items-center gap-2 text-sm leading-5 text-[#475569]">
-            <input
-              type="checkbox"
-              className="size-4 cursor-pointer rounded border border-[#cbd5e1] accent-[#6565f1]"
-              checked={rememberMe}
-              onChange={(e) => setRememberMe(e.target.checked)}
+          <div className="flex items-center gap-2">
+            <Controller
+              name="rememberMe"
+              control={control}
+              render={({ field }) => (
+                <Checkbox
+                  id="rememberMe"
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                />
+              )}
             />
-            <span>Remember me</span>
-          </label>
+            <Label htmlFor="rememberMe" className="cursor-pointer text-[#475569]">
+              Remember me
+            </Label>
+          </div>
           <a
             href="#"
             className="text-sm font-semibold leading-5 text-[#6565f1] no-underline hover:underline"
@@ -115,12 +158,23 @@ export default function LoginForm() {
           </a>
         </div>
 
-        <button
+        <Button
           type="submit"
-          className="w-full cursor-pointer rounded-lg border-none bg-[#6565f1] px-3 py-3.5 font-[inherit] text-sm font-semibold leading-5 text-white shadow-[0_1px_2px_0_rgba(101,101,241,0.2)] transition-colors hover:bg-[#5252d4]"
+          className={cn(
+            "w-full bg-[#6565f1] py-3.5 text-sm font-semibold hover:bg-[#5252d4]",
+            isPending && "cursor-not-allowed"
+          )}
+          disabled={isPending}
         >
-          Sign in
-        </button>
+          {isPending ? (
+            <>
+              <Loader2 className="size-4 animate-spin" />
+              <span>Signing in...</span>
+            </>
+          ) : (
+            <span>Sign in</span>
+          )}
+        </Button>
       </form>
 
       <p className="m-0 text-center text-xs leading-4 text-[#94a3b8]">
