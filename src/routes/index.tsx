@@ -1,8 +1,8 @@
 import { createFileRoute, redirect } from '@tanstack/react-router'
+import { getCookie } from '@/lib/cookie'
 
 export const Route = createFileRoute('/')({
   beforeLoad: () => {
-    const isAuthenticated = localStorage.getItem('auth_token') !== null
-    throw redirect({ to: isAuthenticated ? '/dashboard' : '/login' })
+    throw redirect({ to: getCookie('access_token') ? '/dashboard' : '/login' })
   },
 })

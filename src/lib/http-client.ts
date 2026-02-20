@@ -1,3 +1,5 @@
+import { getCookie } from './cookie';
+
 export class HttpError extends Error {
   status: number;
   body?: unknown;
@@ -21,7 +23,7 @@ async function request<T>(
     'Accept': 'application/json',
   };
 
-  const token = localStorage.getItem('auth_token');
+  const token = getCookie('access_token');
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
