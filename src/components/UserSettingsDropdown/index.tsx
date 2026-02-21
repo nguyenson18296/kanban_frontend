@@ -13,9 +13,11 @@ import { useStoreUser } from '../../stores/use-store-user';
 
 function UserSettingsDropdown() {
   const { mutate: logout } = useLogout();
-  const { user } = useStoreUser();
+  const { user, clearUser } = useStoreUser();
+
   const handleLogout = () => {
     logout();
+    clearUser();
   };
 
   return (

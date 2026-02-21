@@ -1,6 +1,3 @@
-import Sidebar from '@/components/Sidebar';
-import TopHeader from '@/components/TopHeader';
-
 // Figma asset URLs
 const imgSarahAvatar = 'https://www.figma.com/api/mcp/asset/a3359e5c-18bb-48f1-8202-9b0889c54a08';
 const imgDavidAvatar = 'https://www.figma.com/api/mcp/asset/0cecb94a-da96-454f-873d-d21811ff90b0';
@@ -378,61 +375,51 @@ function UpcomingDeadlines() {
 
 export default function Dashboard() {
   return (
-    <div className="flex h-screen bg-[#fafbfc] font-['Inter',sans-serif]">
-      <Sidebar />
+    <div className="mx-auto flex max-w-[1400px] flex-col gap-6">
+      {/* Stat cards */}
+      <div className="flex gap-6">
+        <StatCard
+          icon={imgStatTotalTasks}
+          label="Total Tasks"
+          value="148"
+          change="+12%"
+          positive
+        />
+        <StatCard
+          icon={imgStatInProgress}
+          label="In Progress"
+          value="34"
+          change="+5%"
+          positive
+        />
+        <StatCard
+          icon={imgStatCompleted}
+          label="Completed"
+          value="97"
+          change="+8%"
+          positive
+        />
+        <StatCard
+          icon={imgStatOverdue}
+          label="Overdue"
+          value="17"
+          change="-2%"
+          positive={false}
+        />
+      </div>
 
-      <main className="flex flex-1 flex-col overflow-hidden">
-        <TopHeader />
+      {/* Charts & Activity row */}
+      <div className="flex gap-6">
+        <TasksByStatusChart />
+        <SprintBurndownChart />
+        <RecentActivity />
+      </div>
 
-        <div className="flex-1 overflow-y-auto p-8">
-          <div className="mx-auto flex max-w-[1400px] flex-col gap-6">
-            {/* Stat cards */}
-            <div className="flex gap-6">
-              <StatCard
-                icon={imgStatTotalTasks}
-                label="Total Tasks"
-                value="148"
-                change="+12%"
-                positive
-              />
-              <StatCard
-                icon={imgStatInProgress}
-                label="In Progress"
-                value="34"
-                change="+5%"
-                positive
-              />
-              <StatCard
-                icon={imgStatCompleted}
-                label="Completed"
-                value="97"
-                change="+8%"
-                positive
-              />
-              <StatCard
-                icon={imgStatOverdue}
-                label="Overdue"
-                value="17"
-                change="-2%"
-                positive={false}
-              />
-            </div>
-
-            {/* Charts & Activity row */}
-            <div className="flex gap-6">
-              <TasksByStatusChart />
-              <SprintBurndownChart />
-              <RecentActivity />
-            </div>
-
-            {/* Bottom row: My Tasks & Deadlines */}
-            <div className="flex gap-6">
-              <MyTasksList />
-              <UpcomingDeadlines />
-            </div>
-          </div>
-        </div>
-      </main>
+      {/* Bottom row: My Tasks & Deadlines */}
+      <div className="flex gap-6">
+        <MyTasksList />
+        <UpcomingDeadlines />
+      </div>
     </div>
   );
 }
