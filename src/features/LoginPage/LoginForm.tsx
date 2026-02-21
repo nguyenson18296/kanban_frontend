@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 
 import { useLogin } from './hooks/use-login'
+import { useStoreUser } from '../../stores/use-store-user'
 import { cn } from '@/lib/utils'
 
 const formSchema = z.object({
@@ -45,9 +46,12 @@ export default function LoginForm() {
     },
   })
 
+  const { setUser } = useStoreUser()
+
   async function onSubmit(data: FormSchema) {
     try {
-      await login({ email: data.email, password: data.password })
+      const response = await login({ email: data.email, password: data.password })
+      setUser(response.user)
       navigate({ to: '/dashboard' })
     } catch {
       // Error is handled via isError state in the useEffect above
