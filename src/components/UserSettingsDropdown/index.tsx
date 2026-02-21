@@ -9,12 +9,11 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 import useLogout from './hooks/use-logout';
-
-const imgProfilePictureOfAlex = 'https://www.figma.com/api/mcp/asset/a4977786-8c3d-4a44-b39e-a637e6bf9c2f';
+import { useStoreUser } from '../../stores/use-store-user';
 
 function UserSettingsDropdown() {
   const { mutate: logout } = useLogout();
-
+  const { user } = useStoreUser();
   const handleLogout = () => {
     logout();
   };
@@ -28,8 +27,8 @@ function UserSettingsDropdown() {
           className="overflow-hidden rounded-full border-2 border-[#e2e8f0] p-0"
         >
           <img
-            src={imgProfilePictureOfAlex}
-            alt="Alex Morgan"
+            src={user?.avatar_url}
+            alt={user?.full_name}
             className="h-full w-full object-cover cursor-pointer"
           />
         </Button>
@@ -39,13 +38,13 @@ function UserSettingsDropdown() {
         {/* User info header */}
         <div className="flex items-center gap-3 px-3 py-3">
           <img
-            src={imgProfilePictureOfAlex}
-            alt="Alex Morgan"
+            src={user?.avatar_url}
+            alt={user?.full_name}
             className="h-10 w-10 rounded-full object-cover"
           />
           <div>
-            <p className="m-0 text-sm font-semibold text-[#0f172a]">Alex Morgan</p>
-            <p className="m-0 text-xs text-[#64748b]">alex.morgan@flowboard.app</p>
+            <p className="m-0 text-sm font-semibold text-[#0f172a]">{user?.full_name}</p>
+            <p className="m-0 text-xs text-[#64748b]">{user?.email}</p>
           </div>
         </div>
 
