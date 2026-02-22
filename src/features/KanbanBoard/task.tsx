@@ -10,6 +10,7 @@ import {
 import PriorityDropdown from "@/components/PriorityDropdown";
 import type { ITask, Priority } from "../../types";
 import { cn } from "@/lib/utils";
+import { useUpdateTask } from "./hooks/use-update-task";
 
 const TAG_COLORS: Record<string, string> = {
   Budget: "bg-emerald-50 text-emerald-600 border-emerald-200",
@@ -49,8 +50,10 @@ export default function Task({
   });
 
   const [localPriority, setLocalPriority] = useState<Priority>(priority);
+  const { mutate: updateTaskMutation } = useUpdateTask(id);
 
   const handlePriorityChange = (value: Priority) => {
+    updateTaskMutation({ priority: value });
     setLocalPriority(value);
   };
 
