@@ -1,2 +1,5 @@
 export * from './auth.type'
 export * from './task.type'
+export * from './column.type'
+export * from './board.type'
+export * from './label.type'

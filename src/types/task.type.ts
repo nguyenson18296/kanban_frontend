@@ -1,19 +1,24 @@
+import type { ILabel } from './label.type';
+
+interface IAssignee {
+  id: string;
+  full_name: string;
+  avatar_url: string;
+}
+
+type Priority = "no_priority" | "urgent" | "high" | "medium" | "low";
+
 interface ITask {
   id: string;
   title: string;
   description: string;
-  status: string;
-  priority: string;
+  status: number;
+  priority: Priority;
   ticket_id: string;
-  tag: string;
-  assignee_avatar: string;
-  due_date: string;
-  comments_count?: number;
-  subtasks_done?: number;
-  subtasks_total?: number;
-  progress?: number;
+  labels: ILabel[];
+  assignees: IAssignee[];
   created_at: string;
   updated_at: string;
 }
 
-export type { ITask };
+export type { ITask, Priority };
