@@ -10,6 +10,7 @@ type Priority = "no_priority" | "urgent" | "high" | "medium" | "low";
 
 interface ITask {
   id: string;
+  column_id: number;
   title: string;
   description: string;
   status: number;

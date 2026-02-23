@@ -22,11 +22,15 @@ export default function Column({ id, title, color, tasks, index, isDropTarget }:
     index,
     type: "column",
     accept: ["column", "task"],
+    transition: {
+      duration: 200,
+      easing: "ease-in-out",
+    },
     collisionPriority: CollisionPriority.Low,
   });
 
   return (
-    <div className="flex min-w-[320px] flex-col">
+    <div className="flex min-w-[320px] flex-col px-1">
       {/* Column header */}
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
@@ -47,7 +51,7 @@ export default function Column({ id, title, color, tasks, index, isDropTarget }:
       {/* Column body */}
       <div
         className={cn(
-          "flex flex-1 flex-col rounded-2xl p-3 transition-all duration-200",
+          "flex flex-1 flex-col rounded-2xl transition-all duration-200",
           !isDropTarget && "bg-[#f8fafc]",
           isDropTarget && "border-2 border-dashed border-[#6366f1] bg-[#eef2ff]",
         )}
