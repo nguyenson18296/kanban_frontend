@@ -45,15 +45,14 @@ export default function Task({
     id,
     type: "task",
     group: String(columnId),
-    accept: ["task"],
     index,
   });
 
   const [localPriority, setLocalPriority] = useState<Priority>(priority);
-  const { mutate: updateTaskMutation } = useUpdateTask(id);
+  const { mutate: updateTaskMutation } = useUpdateTask();
 
   const handlePriorityChange = (value: Priority) => {
-    updateTaskMutation({ priority: value });
+    updateTaskMutation({ id, task: { priority: value } });
     setLocalPriority(value);
   };
 
@@ -61,8 +60,10 @@ export default function Task({
     <div
       ref={ref}
       className={cn(
-        "mb-3 cursor-grab rounded-xl border border-[#e8ecf1] bg-white p-4 shadow-sm transition-shadow hover:shadow-md",
-        isDragging && "opacity-50",
+        "mb-3 cursor-grab rounded-xl border bg-white p-4 shadow-sm transition-all hover:shadow-md",
+        isDragging
+          ? "rotate-3 scale-105 border-[#6366f1] shadow-lg ring-2 ring-[#6366f1]/20"
+          : "border-[#e8ecf1]",
       )}
     >
       {/* Tag */}

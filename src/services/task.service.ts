@@ -12,3 +12,11 @@ export const createTask = (task: ITask) => {
 export const updateTask = (id: string, task: Partial<ITask>) => {
   return httpClient.patch<ITask>(`/tasks/${id}`, task);
 }
+
+export const moveTaskToColumn = (id: string, columnId: number, position: number) => {
+  return httpClient.patch<ITask>(`/tasks/${id}/move`, { column_id: columnId, position });
+}
+
+export const reorderTask = (id: string, position: number) => {
+  return httpClient.patch<ITask>(`/tasks/${id}/reorder`, { position });
+}

@@ -1,12 +1,11 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { updateTask } from "@/services/task.service";
-import type { ITask } from "@/types";
+import { reorderTask } from "@/services/task.service";
 
-export const useUpdateTask = () => {
+export const useReorderTask = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, task }: { id: string; task: Partial<ITask> }) => updateTask(id, task),
+    mutationFn: ({ id, position }: { id: string; position: number }) => reorderTask(id, position),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['board'] });
     },
