@@ -3,6 +3,7 @@ import { useSortable } from "@dnd-kit/react/sortable";
 
 import AssigneeDropdown from "@/components/AssigneeDropdown";
 import PriorityDropdown from "@/components/PriorityDropdown";
+import TaskContextMenu from "@/components/TaskContextMenu";
 import type { ITask, Priority, TAssignee } from "../../types";
 import { cn } from "@/lib/utils";
 import { useUpdateTask } from "./hooks/use-update-task";
@@ -30,14 +31,11 @@ interface TaskProps extends ITask {
 }
 
 export default function Task({
-  id,
-  title,
-  labels,
-  priority,
-  assignees,
-  columnId,
   index,
+  columnId,
+  ...task
 }: Readonly<TaskProps>) {
+  const { id, title, labels, priority, assignees } = task;
   const { ref, isDragging } = useSortable({
     id,
     type: "task",
@@ -65,42 +63,46 @@ export default function Task({
   };
 
   return (
-    <div
-      ref={ref}
-      className={cn(
-        "mb-3 cursor-grab rounded-xl border bg-white p-4 shadow-sm transition-all hover:shadow-md",
-        isDragging
-          ? "rotate-3 scale-105 border-[#6366f1] shadow-lg ring-2 ring-[#6366f1]/20"
-          : "border-[#e8ecf1]",
-      )}
+    <TaskContextMenu
+      task={{ ...task, priority: localPriority, column_id: columnId }}
+      onChangePriority={(_task, newPriority) => handlePriorityChange(newPriority)}
     >
-      {/* Tag */}
-      {labels.length > 0 ? (
-        <div className="flex items-center gap-1">
-          {labels.map((label) => (
-            <span
-              key={label.id}
-              className={cn(
-                "inline-block rounded-full border px-2.5 py-0.5 text-xs font-medium",
-                TAG_COLORS[label.name] ?? "bg-white text-[#64748b] border-[#e2e8f0]",
-              )}
-            >
-              {label.name}
-            </span>
-          ))}
-        </div>
-      ) : null}
+      <div
+        ref={ref}
+        className={cn(
+          "mb-3 cursor-grab rounded-xl border bg-white p-4 shadow-sm transition-all hover:shadow-md",
+          isDragging
+            ? "rotate-3 scale-105 border-[#6366f1] shadow-lg ring-2 ring-[#6366f1]/20"
+            : "border-[#e8ecf1]",
+        )}
+      >
+        {/* Tag */}
+        {labels.length > 0 ? (
+          <div className="flex items-center gap-1">
+            {labels.map((label) => (
+              <span
+                key={label.id}
+                className={cn(
+                  "inline-block rounded-full border px-2.5 py-0.5 text-xs font-medium",
+                  TAG_COLORS[label.name] ?? "bg-white text-[#64748b] border-[#e2e8f0]",
+                )}
+              >
+                {label.name}
+              </span>
+            ))}
+          </div>
+        ) : null}
 
-      {/* Title */}
-      <h3 className="mt-2.5 text-sm font-semibold text-[#0f172a]">{title}</h3>
+        {/* Title */}
+        <h3 className="mt-2.5 text-sm font-semibold text-[#0f172a]">{title}</h3>
 
-      {/* Priority */}
-      <PriorityDropdown priority={localPriority} onPriorityChange={handlePriorityChange} />
-      <AssigneeDropdown
-        assignees={assignees}
-        onAssigneeChange={handleAssigneeChange}
-      />
-
-    </div>
+        {/* Priority */}
+        <PriorityDropdown priority={localPriority} onPriorityChange={handlePriorityChange} />
+        <AssigneeDropdown
+          assignees={assignees}
+          onAssigneeChange={handleAssigneeChange}
+        />
+      </div>
+    </TaskContextMenu>
   );
 }

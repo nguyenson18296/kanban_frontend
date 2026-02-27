@@ -61,21 +61,26 @@ export default function AssigneeDropdown({
     setDraft([]);
   };
 
-  const handleOpenChange = (open: boolean) => {
-    if (open) {
-      setDraft(assignees);
-    } else {
-      setSearch("");
-      // Only fire callback if selection actually changed
-      const prevIds = new Set(assignees.map((a) => a.id));
-      const nextIds = new Set(draftRef.current.map((a) => a.id));
-      const changed =
-        prevIds.size !== nextIds.size ||
-        [...prevIds].some((id) => !nextIds.has(id));
-      if (changed) {
-        onAssigneeChange(draftRef.current);
-      }
+  const handleDropdownOpen = () => {
+    setDraft(assignees);
+  };
+
+  const handleDropdownClose = () => {
+    setSearch("");
+    const prevIds = new Set(assignees.map((a) => a.id));
+    const nextIds = new Set(draftRef.current.map((a) => a.id));
+    const changed =
+      prevIds.size !== nextIds.size ||
+      [...prevIds].some((id) => !nextIds.has(id));
+    if (changed) {
+      onAssigneeChange(draftRef.current);
     }
+  };
+
+  const handleOpenChange = (open: boolean) => {
+    const onOpen = handleDropdownOpen;
+    const onClose = handleDropdownClose;
+    (open ? onOpen : onClose)();
   };
 
   const trigger =
