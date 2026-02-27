@@ -10,7 +10,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback, AvatarGroup, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import AvatarGroupCustom from "@/components/AvatarGroup";
 import type { TAssignee } from "@/types";
 import { cn } from "@/lib/utils";
 import { useGetUsers } from "./hooks/use-get-users";
@@ -79,14 +80,9 @@ export default function AssigneeDropdown({
 
   const trigger =
     assignees.length > 0 ? (
-      <AvatarGroup className="pt-4 pb-2">
-        {assignees.map((assignee) => (
-          <Avatar key={assignee.id} id={assignee.id} className="size-5">
-            <AvatarImage src={assignee.avatar_url} />
-            <AvatarFallback>{assignee.full_name.charAt(0)}</AvatarFallback>
-          </Avatar>
-        ))}
-      </AvatarGroup>
+      <button type="button" className="cursor-pointer pt-4 pb-2">
+        <AvatarGroupCustom visibleCount={3} avatars={assignees} />
+      </button>
     ) : (
       <button
         type="button"
