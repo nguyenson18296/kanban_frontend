@@ -1,10 +1,7 @@
 import type { ILabel } from './label.type';
+import type { IUser } from './user.type';
 
-interface IAssignee {
-  id: string;
-  full_name: string;
-  avatar_url: string;
-}
+type TAssignee = Pick<IUser, 'id' | 'full_name' | 'avatar_url'>;
 
 type Priority = "no_priority" | "urgent" | "high" | "medium" | "low";
 
@@ -17,9 +14,9 @@ interface ITask {
   priority: Priority;
   ticket_id: string;
   labels: ILabel[];
-  assignees: IAssignee[];
+  assignees: TAssignee[];
   created_at: string;
   updated_at: string;
 }
 
-export type { ITask, Priority };
+export type { TAssignee, ITask, Priority };

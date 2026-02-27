@@ -20,3 +20,7 @@ export const moveTaskToColumn = (id: string, columnId: number, position: number)
 export const reorderTask = (id: string, position: number) => {
   return httpClient.patch<ITask>(`/tasks/${id}/reorder`, { position });
 }
+
+export const updateTaskAssignees = (id: string, assignee_ids: string[]) => {
+  return httpClient.patch<ITask>(`/tasks/${id}`, { assignee_ids });
+}

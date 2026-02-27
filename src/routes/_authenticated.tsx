@@ -1,11 +1,16 @@
 import { createFileRoute, Outlet, redirect } from '@tanstack/react-router'
 import { getCookie } from '@/lib/cookie'
+import { tryRefreshTokens } from '@/lib/http-client'
 import Sidebar from '@/components/Sidebar'
 import TopHeader from '@/components/TopHeader'
 
 export const Route = createFileRoute('/_authenticated')({
-  beforeLoad: () => {
+  beforeLoad: async () => {
     if (!getCookie('access_token')) {
+      if (getCookie('refresh_token')) {
+        await tryRefreshTokens();
+        return;
+      }
       throw redirect({ to: '/login' })
     }
   },
