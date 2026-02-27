@@ -8,15 +8,17 @@ import type { ITask } from "../../types";
 import { useGetBoard } from "./hooks/use-get-board";
 import { useMoveTaskToColumn } from "./hooks/use-move-task-to-column";
 import { useReorderTask } from "./hooks/use-reorder-task";
+import { useStoreKanbanBoard } from "@/stores/use-store-kanban-board";
 
 export default function KanbanBoard() {
-  const { data: board, isLoading } = useGetBoard();
-
-  if (isLoading || !board) {
+  useGetBoard();
+  const kanbanBoard = useStoreKanbanBoard((state) => state.kanbanBoard);
+  const isLoading = useStoreKanbanBoard((state) => state.isLoading);
+  if (isLoading || !kanbanBoard) {
     return <div className="p-8 text-sm text-[#64748b]">Loading board...</div>;
   }
 
-  return <Board board={board} />;
+  return <Board board={kanbanBoard} />;
 }
 
 function Board({ board }: Readonly<{ board: NonNullable<ReturnType<typeof useGetBoard>['data']> }>) {
@@ -32,15 +34,21 @@ function Board({ board }: Readonly<{ board: NonNullable<ReturnType<typeof useGet
     sortedColumns.map((column) => String(column.id))
   );
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
+  // When not dragging, derive from board so we reflect store updates (e.g. assignee).
+  // When dragging, use local items so drag-and-drop state is correct.
+  const itemsFromColumns = Object.fromEntries(
+    columns.map((col) => [col.id, col.tasks])
+  );
+  const effectiveItems = draggedTaskId ? items : itemsFromColumns;
+
   const [sourceColumn, setSourceColumn] = useState<string | null>(null);
   const [sourceTaskPosition, setSourceTaskPosition] = useState<number | null>(null);
   const { mutate: moveTaskToColumnMutation } = useMoveTaskToColumn();
   const { mutate: reorderTaskMutation } = useReorderTask();
 
-  // Derive activeColumn from current items — always in sync after every render
   const activeColumn = draggedTaskId
-    ? Object.keys(items).find((colId) =>
-        items[colId].some((t) => t.id === draggedTaskId)
+    ? Object.keys(effectiveItems).find((colId) =>
+        effectiveItems[colId].some((t) => t.id === draggedTaskId)
       ) ?? null
     : null;
 
@@ -53,14 +61,15 @@ function Board({ board }: Readonly<{ board: NonNullable<ReturnType<typeof useGet
         // source information is getting from `useSortable` of Task component
         const { source } = event.operation;
         if (source?.type === "task") {
+          setItems(itemsFromColumns);
           setDraggedTaskId(String(source.id));
-          const col = Object.keys(items).find((colId) =>
-            items[colId].some((t) => t.id === String(source.id))
+          const col = Object.keys(itemsFromColumns).find((colId) =>
+            itemsFromColumns[colId].some((t) => t.id === String(source.id))
           );
           setSourceColumn(col ?? null);
           const positionInColumn = col === undefined
             ? -1
-            : items[col].findIndex((t) => t.id === String(source.id));
+            : itemsFromColumns[col].findIndex((t) => t.id === String(source.id));
           setSourceTaskPosition(positionInColumn >= 0 ? positionInColumn : null);
         }
       }}
@@ -112,7 +121,7 @@ function Board({ board }: Readonly<{ board: NonNullable<ReturnType<typeof useGet
               id={column.id}
               title={column.name}
               color={column.color}
-              tasks={items[String(column.id)] ?? []}
+              tasks={effectiveItems[String(column.id)] ?? []}
               index={columnIndex}
               isDropTarget={dropTargetColumn === String(column.id)}
             />

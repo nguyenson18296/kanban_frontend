@@ -1,16 +1,13 @@
 import { useState } from "react";
 import { useSortable } from "@dnd-kit/react/sortable";
-import {
-  AvatarGroup,
-  Avatar,
-  AvatarImage,
-  AvatarFallback,
-} from "@/components/ui/avatar";
 
+import AssigneeDropdown from "@/components/AssigneeDropdown";
 import PriorityDropdown from "@/components/PriorityDropdown";
-import type { ITask, Priority } from "../../types";
+import type { ITask, Priority, TAssignee } from "../../types";
 import { cn } from "@/lib/utils";
 import { useUpdateTask } from "./hooks/use-update-task";
+import { useUpdateAssignees } from "@/components/AssigneeDropdown/hooks/use-update-assignees";
+import { useStoreKanbanBoard } from "@/stores/use-store-kanban-board";
 
 const TAG_COLORS: Record<string, string> = {
   Budget: "bg-emerald-50 text-emerald-600 border-emerald-200",
@@ -50,10 +47,21 @@ export default function Task({
 
   const [localPriority, setLocalPriority] = useState<Priority>(priority);
   const { mutate: updateTaskMutation } = useUpdateTask();
+  const { mutate: updateAssigneesMutation } = useUpdateAssignees();
+  const updateTaskAssignees = useStoreKanbanBoard((state) => state.updateTaskAssignees);
 
   const handlePriorityChange = (value: Priority) => {
     updateTaskMutation({ id, task: { priority: value } });
     setLocalPriority(value);
+  };
+
+  const handleAssigneeChange = (newAssignees: TAssignee[]) => {
+    updateAssigneesMutation({
+      id,
+      assignee_ids: newAssignees.map((a) => a.id),
+      previousAssignees: assignees,
+    });
+    updateTaskAssignees(id, newAssignees);
   };
 
   return (
@@ -88,18 +96,10 @@ export default function Task({
 
       {/* Priority */}
       <PriorityDropdown priority={localPriority} onPriorityChange={handlePriorityChange} />
-
-      {/* Footer */}
-      {assignees.length > 0 ? (
-        <AvatarGroup className="pt-4 pb-2">
-          {assignees.map((assignee) => (
-            <Avatar key={assignee.id} id={assignee.id} className="size-5">
-              <AvatarImage src={assignee.avatar_url} />
-              <AvatarFallback>{assignee.full_name.charAt(0)}</AvatarFallback>
-            </Avatar>
-          ))}
-        </AvatarGroup>
-      ) : null}
+      <AssigneeDropdown
+        assignees={assignees}
+        onAssigneeChange={handleAssigneeChange}
+      />
 
     </div>
   );

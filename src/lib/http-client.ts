@@ -22,15 +22,42 @@ let refreshPromise: Promise<LoginResponse> | null = null;
 
 export function saveTokens(data: LoginResponse) {
   const payload = decodeJwt(data.access_token);
-  const maxAge = payload.exp ? payload.exp - Math.floor(Date.now() / 1000) : undefined;
+  const accessMaxAge = payload.exp ? payload.exp - Math.floor(Date.now() / 1000) : undefined;
 
-  setCookie('access_token', data.access_token, { maxAge });
-  setCookie('refresh_token', data.refresh_token, { maxAge });
+  setCookie('access_token', data.access_token, { maxAge: accessMaxAge });
+  // Refresh token may be opaque (not a JWT) — safely try to decode for maxAge
+  let refreshMaxAge: number | undefined;
+  try {
+    const refreshPayload = decodeJwt(data.refresh_token);
+    refreshMaxAge = refreshPayload.exp
+      ? refreshPayload.exp - Math.floor(Date.now() / 1000)
+      : undefined;
+  } catch {
+    // Opaque refresh token — no maxAge, cookie persists until session ends
+  }
+  setCookie('refresh_token', data.refresh_token, { maxAge: refreshMaxAge });
 }
 
 function clearTokens() {
   removeCookie('access_token');
   removeCookie('refresh_token');
+}
+
+/**
+ * Attempt to refresh tokens. Used by route guards to refresh
+ * before redirecting to login. Throws on failure.
+ */
+export async function tryRefreshTokens(): Promise<void> {
+  try {
+    refreshPromise ??= refreshTokens();
+    const data = await refreshPromise;
+    saveTokens(data);
+  } catch {
+    clearTokens();
+    throw new HttpError(401, 'Session expired');
+  } finally {
+    refreshPromise = null;
+  }
 }
 
 async function refreshTokens(): Promise<LoginResponse> {
@@ -128,7 +155,7 @@ export const httpClient = {
   patch<T>(path: string, body?: unknown) {
     return request<T>('PATCH', path, { body });
   },
-  delete<T>(path: string) {
-    return request<T>('DELETE', path);
+  delete<T>(path: string, body?: unknown) {
+    return request<T>('DELETE', path, { body });
   },
 };
