@@ -8,6 +8,7 @@ interface IStoreKanbanBoard {
   moveTask: (taskId: string, fromColumnId: number, toColumnId: number, position: number) => void;
   reorderTask: (columnId: number, taskId: string, newPosition: number) => void;
   updateTaskPriority: (taskId: string, priority: Priority) => void;
+  updateTaskTitle: (taskId: string, title: string) => void;
 }
 
 export const useStoreKanbanBoard = create<IStoreKanbanBoard>((set) => ({
@@ -93,5 +94,20 @@ export const useStoreKanbanBoard = create<IStoreKanbanBoard>((set) => ({
       })),
     };
     return { kanbanBoard: newKanbanBoard };
+  }),
+  updateTaskTitle: (taskId: string, title: string) => set((state) => {
+    if (!state.kanbanBoard) return state;
+
+    return {
+      kanbanBoard: {
+        ...state.kanbanBoard,
+        columns: state.kanbanBoard.columns.map((column) => ({
+          ...column,
+          tasks: column.tasks.map((task) =>
+            task.id === taskId ? { ...task, title } : task
+          ),
+        })),
+      },
+    };
   }),
 }));

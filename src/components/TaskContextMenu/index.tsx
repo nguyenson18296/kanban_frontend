@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   Flag,
   FilePlusCornerIcon,
@@ -5,6 +6,7 @@ import {
   Copy,
   Bell,
   Trash2,
+  Pencil,
 } from "lucide-react";
 
 import {
@@ -23,6 +25,7 @@ import type { ITask } from "@/types";
 import StatusSubmenu from "./status-submenu";
 import AssigneeSubmenu from "./assignee-submenu";
 import PrioritySubmenu from "./priority-submenu";
+import RenameTaskModal from "@/components/Modals/rename-task-modal";
 
 const SECOND_GROUP_ITEMS = [
   {
@@ -71,13 +74,22 @@ export default function TaskContextMenu({
   children,
   onDelete,
 }: Readonly<TaskContextMenuProps>) {
+  const [renameOpen, setRenameOpen] = useState(false);
+
   return (
+    <>
     <ContextMenu>
       <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
       <ContextMenuContent className="w-48">
         <StatusSubmenu task={task} />
         <AssigneeSubmenu task={task} />
         <PrioritySubmenu task={task} />
+        <ContextMenuSeparator />
+        <ContextMenuItem onSelect={() => setRenameOpen(true)}>
+          <Pencil className="size-4" />
+          &nbsp;
+          Rename
+        </ContextMenuItem>
         <ContextMenuSeparator />
         {SECOND_GROUP_ITEMS.map((item) => (
           <ContextMenuSub key={item.id}>
@@ -107,5 +119,13 @@ export default function TaskContextMenu({
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
+    {renameOpen && (
+      <RenameTaskModal
+        task={task}
+        open={renameOpen}
+        onOpenChange={setRenameOpen}
+      />
+    )}
+    </>
   );
 }
