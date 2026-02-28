@@ -1,4 +1,4 @@
-import { AlertOctagon, SquareEqual, Signal, SignalHigh, SignalMedium, type LucideIcon, Check } from "lucide-react";
+import { Check } from "lucide-react";
 
 import {
   DropdownMenu,
@@ -8,27 +8,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { Priority } from "@/types";
 import { cn } from "@/lib/utils";
+import { PRIORITY_OPTIONS } from "@/constants/priority";
 
 interface PriorityProps {
   priority: Priority;
   onPriorityChange: (priority: Priority) => void;
 }
-
-interface PriorityOption {
-  value: Priority;
-  label: string;
-  icon: LucideIcon;
-  color: string;
-  shortcut: string;
-}
-
-const PRIORITY_OPTIONS: PriorityOption[] = [
-  { value: "no_priority", label: "No priority", icon: SquareEqual, color: "text-[#94a3b8]", shortcut: "0" },
-  { value: "urgent", label: "Urgent", icon: AlertOctagon, color: "text-red-600", shortcut: "1" },
-  { value: "high", label: "High", icon: Signal, color: "text-orange-500", shortcut: "2" },
-  { value: "medium", label: "Medium", icon: SignalHigh, color: "text-yellow-500", shortcut: "3" },
-  { value: "low", label: "Low", icon: SignalMedium, color: "text-blue-400", shortcut: "4" },
-];
 
   export default function PriorityDropdown({ priority, onPriorityChange }: Readonly<PriorityProps>) {
   const current =
