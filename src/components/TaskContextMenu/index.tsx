@@ -21,6 +21,7 @@ import type { ReactNode } from "react";
 import type { ITask } from "@/types";
 
 import StatusSubmenu from "./status-submenu";
+import AssigneeSubmenu from "./assignee-submenu";
 
 const SECOND_GROUP_ITEMS = [
   {
@@ -74,6 +75,7 @@ export default function TaskContextMenu({
       <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
       <ContextMenuContent className="w-48">
         <StatusSubmenu task={task} />
+        <AssigneeSubmenu task={task} />
         <ContextMenuSeparator />
         {SECOND_GROUP_ITEMS.map((item) => (
           <ContextMenuSub key={item.id}>

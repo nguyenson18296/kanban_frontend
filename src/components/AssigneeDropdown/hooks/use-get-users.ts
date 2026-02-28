@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+
 import { getUsers } from "@/services/user.service";
 import { useStoreUsersList } from "@/stores/use-store-users-list";
 
