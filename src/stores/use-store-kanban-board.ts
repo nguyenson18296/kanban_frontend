@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { IBoard, TAssignee } from '@/types';
+import type { IBoard, TAssignee, Priority } from '@/types';
 
 interface IStoreKanbanBoard {
   kanbanBoard: IBoard | null;
@@ -7,6 +7,7 @@ interface IStoreKanbanBoard {
   updateTaskAssignees: (taskId: string, assignees: TAssignee[]) => void;
   moveTask: (taskId: string, fromColumnId: number, toColumnId: number, position: number) => void;
   reorderTask: (columnId: number, taskId: string, newPosition: number) => void;
+  updateTaskPriority: (taskId: string, priority: Priority) => void;
 }
 
 export const useStoreKanbanBoard = create<IStoreKanbanBoard>((set) => ({
@@ -78,5 +79,19 @@ export const useStoreKanbanBoard = create<IStoreKanbanBoard>((set) => ({
         }),
       },
     };
+  }),
+  updateTaskPriority: (taskId: string, priority: Priority) => set((state) => {
+    if (!state.kanbanBoard) return state;
+
+    const newKanbanBoard = {
+      ...state.kanbanBoard,
+      columns: state.kanbanBoard.columns.map((column) => ({
+        ...column,
+        tasks: column.tasks.map((task) =>
+          task.id === taskId ? { ...task, priority } : task
+        ),
+      })),
+    };
+    return { kanbanBoard: newKanbanBoard };
   }),
 }));

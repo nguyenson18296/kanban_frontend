@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useSortable } from "@dnd-kit/react/sortable";
 
 import AssigneeDropdown from "@/components/AssigneeDropdown";
@@ -43,14 +42,15 @@ export default function Task({
     index,
   });
 
-  const [localPriority, setLocalPriority] = useState<Priority>(priority);
   const { mutate: updateTaskMutation } = useUpdateTask();
   const { mutate: updateAssigneesMutation } = useUpdateAssignees();
   const updateTaskAssignees = useStoreKanbanBoard((state) => state.updateTaskAssignees);
+  const updateTaskPriority = useStoreKanbanBoard((state) => state.updateTaskPriority);
 
   const handlePriorityChange = (value: Priority) => {
+    if (priority === value) return;
+    updateTaskPriority(id, value);
     updateTaskMutation({ id, task: { priority: value } });
-    setLocalPriority(value);
   };
 
   const handleAssigneeChange = (newAssignees: TAssignee[]) => {
@@ -64,7 +64,7 @@ export default function Task({
 
   return (
     <TaskContextMenu
-      task={{ ...task, priority: localPriority, column_id: columnId }}
+      task={{ ...task, column_id: columnId }}
     >
       <div
         ref={ref}
@@ -96,7 +96,7 @@ export default function Task({
         <h3 className="mt-2.5 text-sm font-semibold text-[#0f172a]">{title}</h3>
 
         {/* Priority */}
-        <PriorityDropdown priority={localPriority} onPriorityChange={handlePriorityChange} />
+        <PriorityDropdown priority={priority} onPriorityChange={handlePriorityChange} />
         <AssigneeDropdown
           assignees={assignees}
           onAssigneeChange={handleAssigneeChange}

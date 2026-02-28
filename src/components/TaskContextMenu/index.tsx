@@ -22,6 +22,7 @@ import type { ITask } from "@/types";
 
 import StatusSubmenu from "./status-submenu";
 import AssigneeSubmenu from "./assignee-submenu";
+import PrioritySubmenu from "./priority-submenu";
 
 const SECOND_GROUP_ITEMS = [
   {
@@ -76,6 +77,7 @@ export default function TaskContextMenu({
       <ContextMenuContent className="w-48">
         <StatusSubmenu task={task} />
         <AssigneeSubmenu task={task} />
+        <PrioritySubmenu task={task} />
         <ContextMenuSeparator />
         {SECOND_GROUP_ITEMS.map((item) => (
           <ContextMenuSub key={item.id}>
