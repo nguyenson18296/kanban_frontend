@@ -1,13 +1,9 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import AvatarGroupCustom from "../index";
-import type { TAssignee } from "@/types";
+import { createAssignee } from "@/test-factories";
 
 afterEach(cleanup);
-
-function createAssignee(id: string, name: string): TAssignee {
-  return { id, full_name: name, avatar_url: "" };
-}
 
 describe("AvatarGroupCustom", () => {
   it("renders nothing when avatars is empty", () => {
