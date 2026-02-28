@@ -6,7 +6,7 @@ export const useMoveTaskToColumn = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, columnId, position }: { id: string; columnId: number; position: number }) => moveTaskToColumn(id, columnId, position),
-    onSuccess: () => {
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['board'] });
     },
   });

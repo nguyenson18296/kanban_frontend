@@ -11,9 +11,8 @@ import { useReorderTask } from "./hooks/use-reorder-task";
 import { useStoreKanbanBoard } from "@/stores/use-store-kanban-board";
 
 export default function KanbanBoard() {
-  useGetBoard();
+  const { isLoading } = useGetBoard();
   const kanbanBoard = useStoreKanbanBoard((state) => state.kanbanBoard);
-  const isLoading = useStoreKanbanBoard((state) => state.isLoading);
   if (isLoading || !kanbanBoard) {
     return <div className="p-8 text-sm text-[#64748b]">Loading board...</div>;
   }
@@ -45,6 +44,8 @@ function Board({ board }: Readonly<{ board: NonNullable<ReturnType<typeof useGet
   const [sourceTaskPosition, setSourceTaskPosition] = useState<number | null>(null);
   const { mutate: moveTaskToColumnMutation } = useMoveTaskToColumn();
   const { mutate: reorderTaskMutation } = useReorderTask();
+  const moveTaskInStore = useStoreKanbanBoard((state) => state.moveTask);
+  const reorderTaskInStore = useStoreKanbanBoard((state) => state.reorderTask);
 
   const activeColumn = draggedTaskId
     ? Object.keys(effectiveItems).find((colId) =>
@@ -90,18 +91,20 @@ function Board({ board }: Readonly<{ board: NonNullable<ReturnType<typeof useGet
         if (!event.canceled && source?.type === "column") {
           setColumnOrder((columns) => move(columns, event));
         }
-        if (!event.canceled && source?.type === "task" && draggedTaskId && activeColumn) {
+        if (!event.canceled && source?.type === "task" && draggedTaskId && activeColumn && sourceColumn) {
           const foundIndex = items[activeColumn]?.findIndex((t) => t.id === draggedTaskId) ?? -1;
           const newPosition = Math.max(0, foundIndex);
 
           if (activeColumn === sourceColumn) {
             if (initialPosition !== null && newPosition !== initialPosition) {
+              reorderTaskInStore(Number(activeColumn), draggedTaskId, newPosition);
               reorderTaskMutation({
                 id: draggedTaskId,
                 position: newPosition,
               });
             }
           } else {
+            moveTaskInStore(draggedTaskId, Number(sourceColumn), Number(activeColumn), newPosition);
             moveTaskToColumnMutation({
               id: draggedTaskId,
               columnId: Number(activeColumn),

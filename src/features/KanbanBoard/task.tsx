@@ -65,7 +65,6 @@ export default function Task({
   return (
     <TaskContextMenu
       task={{ ...task, priority: localPriority, column_id: columnId }}
-      onChangePriority={(_task, newPriority) => handlePriorityChange(newPriority)}
     >
       <div
         ref={ref}
