@@ -6,7 +6,7 @@ export const useReorderTask = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, position }: { id: string; position: number }) => reorderTask(id, position),
-    onSuccess: () => {
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['board'] });
     },
   });
