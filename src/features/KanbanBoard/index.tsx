@@ -1,5 +1,6 @@
 import { DragDropProvider } from "@dnd-kit/react";
 import { move } from "@dnd-kit/helpers";
+import { useParams } from "@tanstack/react-router";
 
 import Column from "./column";
 import { useState } from "react";
@@ -11,7 +12,8 @@ import { useReorderTask } from "./hooks/use-reorder-task";
 import { useStoreKanbanBoard } from "@/stores/use-store-kanban-board";
 
 export default function KanbanBoard() {
-  const { isLoading } = useGetBoard();
+  const { projectId } = useParams({ from: "/_authenticated/projects/$projectId" });
+  const { isLoading } = useGetBoard(projectId);
   const kanbanBoard = useStoreKanbanBoard((state) => state.kanbanBoard);
   if (isLoading || !kanbanBoard) {
     return <div className="p-8 text-sm text-[#64748b]">Loading board...</div>;
