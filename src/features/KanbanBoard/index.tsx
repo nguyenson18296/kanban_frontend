@@ -12,7 +12,7 @@ import { useReorderTask } from "./hooks/use-reorder-task";
 import { useStoreKanbanBoard } from "@/stores/use-store-kanban-board";
 
 export default function KanbanBoard() {
-  const { projectId } = useParams({ from: "/_authenticated/projects/$projectId" });
+  const { projectId } = useParams({ from: "/_authenticated/projects/$projectId/" });
   const { isLoading } = useGetBoard(projectId);
   const kanbanBoard = useStoreKanbanBoard((state) => state.kanbanBoard);
   if (isLoading || !kanbanBoard) {
