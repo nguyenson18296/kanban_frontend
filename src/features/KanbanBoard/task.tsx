@@ -1,4 +1,5 @@
 import { useSortable } from "@dnd-kit/react/sortable";
+import { useRouter, useParams } from "@tanstack/react-router";
 
 import AssigneeDropdown from "@/components/AssigneeDropdown";
 import PriorityDropdown from "@/components/PriorityDropdown";
@@ -41,6 +42,8 @@ export default function Task({
     group: String(columnId),
     index,
   });
+  const router = useRouter();
+  const { projectId } = useParams({ from: "/_authenticated/projects/$projectId/" });
 
   const { mutate: updateTaskMutation } = useUpdateTask();
   const { mutate: updateAssigneesMutation } = useUpdateAssignees();
@@ -62,18 +65,33 @@ export default function Task({
     updateTaskAssignees(id, newAssignees);
   };
 
+  const handleClick = (ticketId: string) => {
+    router.navigate({ to: "/projects/$projectId/tasks/$taskId", params: { projectId, taskId: ticketId } });
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent, ticketId: string) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      handleClick(ticketId);
+    }
+  };
+
   return (
     <TaskContextMenu
       task={{ ...task, column_id: columnId }}
     >
       <div
         ref={ref}
+        role="button"
+        tabIndex={0}
         className={cn(
           "mb-3 cursor-grab rounded-xl border bg-white p-4 shadow-sm transition-all hover:shadow-md",
           isDragging
             ? "rotate-3 scale-105 border-[#6366f1] shadow-lg ring-2 ring-[#6366f1]/20"
             : "border-[#e8ecf1]",
         )}
+        onClick={() => handleClick(task.ticket_id)}
+        onKeyDown={(e) => handleKeyDown(e, task.ticket_id)}
       >
         {/* Tag */}
         {labels.length > 0 ? (

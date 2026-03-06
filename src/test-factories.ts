@@ -53,6 +53,7 @@ export function createTask(overrides: Partial<ITask> = {}): ITask {
     ticket_id: "T-1",
     labels: [],
     assignees: [],
+    creator: createUser(),
     created_at: "",
     updated_at: "",
     ...overrides,

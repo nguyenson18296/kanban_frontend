@@ -5,6 +5,10 @@ export const getTasks = () => {
   return httpClient.get<ITask[]>('/tasks');
 }
 
+export const getTaskByTicketId = (ticketId: string) => {
+  return httpClient.get<ITask>(`/tasks/by-ticket/${ticketId}`);
+}
+
 export const createTask = (task: ITask) => {
   return httpClient.post<ITask>('/tasks', task);
 }
