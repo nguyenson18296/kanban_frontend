@@ -66,7 +66,7 @@ export default function Task({
   };
 
   const handleClick = (ticketId: string) => {
-    router.navigate({ to: "/projects/$projectId/tasks/$taskId", params: { projectId, taskId: ticketId } });
+    router.navigate({ to: "/_authenticated/projects/$projectId/tasks/$taskId", params: { projectId, taskId: ticketId } });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent, ticketId: string) => {
