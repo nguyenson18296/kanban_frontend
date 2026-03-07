@@ -114,11 +114,16 @@ export default function Task({
         <h3 className="mt-2.5 text-sm font-semibold text-[#0f172a]">{title}</h3>
 
         {/* Priority */}
-        <PriorityDropdown priority={priority} onPriorityChange={handlePriorityChange} />
-        <AssigneeDropdown
-          assignees={assignees}
-          onAssigneeChange={handleAssigneeChange}
-        />
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="flex items-center justify-between"
+        >
+          <PriorityDropdown priority={priority} onPriorityChange={handlePriorityChange} />
+          <AssigneeDropdown
+            assignees={assignees}
+            onAssigneeChange={handleAssigneeChange}
+          />
+        </div>
       </div>
     </TaskContextMenu>
   );

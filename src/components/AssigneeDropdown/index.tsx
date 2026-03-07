@@ -19,6 +19,7 @@ import { useGetUsers } from "./hooks/use-get-users";
 interface AssigneeDropdownProps {
   assignees: TAssignee[];
   onAssigneeChange: (assignees: TAssignee[]) => void;
+  trigger?: React.ReactNode;
 }
 
 function getInitials(name: string): string {
@@ -33,6 +34,7 @@ function getInitials(name: string): string {
 export default function AssigneeDropdown({
   assignees,
   onAssigneeChange,
+  trigger,
 }: Readonly<AssigneeDropdownProps>) {
   const [search, setSearch] = useState("");
   const [draft, setDraft] = useState<TAssignee[]>(assignees);
@@ -83,7 +85,7 @@ export default function AssigneeDropdown({
     (open ? onOpen : onClose)();
   };
 
-  const trigger =
+  const defaultTrigger =
     assignees.length > 0 ? (
       <button type="button" className="cursor-pointer pt-4 pb-2">
         <AvatarGroupCustom visibleCount={3} avatars={assignees} />
@@ -99,7 +101,7 @@ export default function AssigneeDropdown({
 
   return (
     <DropdownMenu onOpenChange={handleOpenChange}>
-      <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
+      <DropdownMenuTrigger asChild>{trigger ?? defaultTrigger}</DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-52 h-96">
         <div className="px-2 py-1.5">
           <Input

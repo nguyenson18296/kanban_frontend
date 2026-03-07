@@ -13,9 +13,10 @@ import { PRIORITY_OPTIONS } from "@/constants/priority";
 interface PriorityProps {
   priority: Priority;
   onPriorityChange: (priority: Priority) => void;
+  trigger?: React.ReactNode;
 }
 
-  export default function PriorityDropdown({ priority, onPriorityChange }: Readonly<PriorityProps>) {
+  export default function PriorityDropdown({ priority, onPriorityChange, trigger }: Readonly<PriorityProps>) {
   const current =
     PRIORITY_OPTIONS.find((o) => o.value === priority) ?? PRIORITY_OPTIONS[0];
   const Icon = current.icon;
@@ -24,18 +25,22 @@ interface PriorityProps {
     onPriorityChange(value);
   };
 
+  const defaultTrigger = (
+    <button
+      type="button"
+      className={cn(
+        "mt-2 flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs font-medium transition-colors hover:bg-[#f1f5f9]",
+        current.color,
+      )}
+    >
+      <Icon className="size-6" />
+    </button>
+  );
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          className={cn(
-            "mt-2 flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs font-medium transition-colors hover:bg-[#f1f5f9]",
-            current.color,
-          )}
-        >
-          <Icon className="size-6" />
-        </button>
+        {trigger ?? defaultTrigger}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-48">
         {PRIORITY_OPTIONS.map((option) => {

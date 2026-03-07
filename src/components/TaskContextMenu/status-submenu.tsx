@@ -3,24 +3,25 @@ import { ChartPie } from "lucide-react";
 
 import { useStoreKanbanBoard } from "@/stores/use-store-kanban-board";
 import { useMoveTaskToColumn } from "@/features/KanbanBoard/hooks/use-move-task-to-column";
-import type { ITask } from "@/types";
 
 interface StatusSubmenuProps {
-  task: ITask;
+  // task: ITask;
+  id: string;
+  column_id: number;
 }
 
-export default function StatusSubmenu({ task }: Readonly<StatusSubmenuProps>) {
+export default function StatusSubmenu({ id, column_id }: Readonly<StatusSubmenuProps>) {
   const board = useStoreKanbanBoard((state) => state.kanbanBoard);
   const moveTaskInStore = useStoreKanbanBoard((state) => state.moveTask);
   const { mutate: moveTaskToColumnMutation } = useMoveTaskToColumn();
 
   const moveTask = (columnId: number) => {
-    moveTaskInStore(task.id, task.column_id, columnId, 0);
-    moveTaskToColumnMutation({ id: task.id, columnId, position: 0 });
+    moveTaskInStore(id, column_id, columnId, 0);
+    moveTaskToColumnMutation({ id, columnId, position: 0 });
   };
 
   const columns = board?.columns ?? [];
-  const filteredColumns = columns.filter((column) => column.id !== task.column_id);
+  const filteredColumns = columns.filter((column) => column.id !== column_id);
 
   return (
     <ContextMenuSub>

@@ -28,3 +28,7 @@ export const reorderTask = (id: string, position: number) => {
 export const updateTaskAssignees = (id: string, assignee_ids: string[]) => {
   return httpClient.patch<ITask>(`/tasks/${id}`, { assignee_ids });
 }
+
+export const updateTaskLabels = (id: string, label_ids: string[]) => {
+  return httpClient.patch<ITask>(`/tasks/${id}`, { label_ids });
+}

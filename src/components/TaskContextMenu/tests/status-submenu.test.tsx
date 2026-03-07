@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import StatusSubmenu from "../status-submenu";
-import { createColumn, createTask } from "@/test-factories";
+import { createColumn } from "@/test-factories";
 import type { IColumn } from "@/types/column.type";
 
 // --- Mocks ---
@@ -72,14 +72,14 @@ describe("StatusSubmenu", () => {
   });
 
   it("renders the Status trigger with an icon", () => {
-    render(<StatusSubmenu task={createTask()} />);
+    render(<StatusSubmenu id="task-1" column_id={1} />);
 
     expect(screen.getByText("Status")).toBeInTheDocument();
     expect(screen.getByTestId("sub-trigger").querySelector("svg")).toBeInTheDocument();
   });
 
   it("shows columns except the task's current column", () => {
-    render(<StatusSubmenu task={createTask({ column_id: 1 })} />);
+    render(<StatusSubmenu id="task-1" column_id={1} />);
 
     expect(screen.getByText("In Progress")).toBeInTheDocument();
     expect(screen.getByText("Done")).toBeInTheDocument();
@@ -87,7 +87,7 @@ describe("StatusSubmenu", () => {
   });
 
   it("excludes the correct column when task is in a different column", () => {
-    render(<StatusSubmenu task={createTask({ column_id: 2 })} />);
+    render(<StatusSubmenu id="task-1" column_id={2} />);
 
     expect(screen.getByText("To Do")).toBeInTheDocument();
     expect(screen.getByText("Done")).toBeInTheDocument();
@@ -96,8 +96,7 @@ describe("StatusSubmenu", () => {
 
   it("calls moveTask store action and mutation when a column is selected", async () => {
     const user = userEvent.setup();
-    const task = createTask({ id: "task-42", column_id: 1 });
-    render(<StatusSubmenu task={task} />);
+    render(<StatusSubmenu id="task-42" column_id={1} />);
 
     await user.click(screen.getByText("In Progress"));
 
@@ -107,8 +106,7 @@ describe("StatusSubmenu", () => {
 
   it("passes position 0 for all moves", async () => {
     const user = userEvent.setup();
-    const task = createTask({ id: "task-1", column_id: 1 });
-    render(<StatusSubmenu task={task} />);
+    render(<StatusSubmenu id="task-1" column_id={1} />);
 
     await user.click(screen.getByText("Done"));
 
@@ -118,7 +116,7 @@ describe("StatusSubmenu", () => {
 
   it("renders no menu items when board is null", () => {
     mockBoard = null;
-    render(<StatusSubmenu task={createTask()} />);
+    render(<StatusSubmenu id="task-1" column_id={1} />);
 
     const content = screen.getByTestId("sub-content");
     expect(content).toBeEmptyDOMElement();
@@ -126,14 +124,14 @@ describe("StatusSubmenu", () => {
 
   it("renders no menu items when the task's column is the only column", () => {
     mockBoard = { columns: [createColumn(1, "To Do", "#ff0000")] };
-    render(<StatusSubmenu task={createTask({ column_id: 1 })} />);
+    render(<StatusSubmenu id="task-1" column_id={1} />);
 
     const content = screen.getByTestId("sub-content");
     expect(content).toBeEmptyDOMElement();
   });
 
   it("displays column color indicators", () => {
-    render(<StatusSubmenu task={createTask({ column_id: 1 })} />);
+    render(<StatusSubmenu id="task-1" column_id={1} />);
 
     const inProgressButton = screen.getByText("In Progress").closest("button")!;
     const colorDot = inProgressButton.querySelector("span");

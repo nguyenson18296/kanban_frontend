@@ -81,7 +81,7 @@ export default function TaskContextMenu({
     <ContextMenu>
       <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
       <ContextMenuContent className="w-48">
-        <StatusSubmenu task={task} />
+        <StatusSubmenu id={task.id} column_id={task.column_id} />
         <AssigneeSubmenu task={task} />
         <PrioritySubmenu task={task} />
         <ContextMenuSeparator />
