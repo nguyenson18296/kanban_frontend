@@ -15,6 +15,7 @@ interface ITask {
   ticket_id: string;
   labels: ILabel[];
   assignees: TAssignee[];
+  due_date: string | null;
   creator: IUser;
   created_at: string;
   updated_at: string;

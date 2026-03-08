@@ -25,7 +25,9 @@ import type { ITask } from "@/types";
 import StatusSubmenu from "./status-submenu";
 import AssigneeSubmenu from "./assignee-submenu";
 import PrioritySubmenu from "./priority-submenu";
+import DueDateSubmenu from "./due-date-submenu";
 import RenameTaskModal from "@/components/Modals/rename-task-modal";
+import EditDueDateModal from "@/components/Modals/edit-due-date-modal";
 
 const SECOND_GROUP_ITEMS = [
   {
@@ -75,6 +77,7 @@ export default function TaskContextMenu({
   onDelete,
 }: Readonly<TaskContextMenuProps>) {
   const [renameOpen, setRenameOpen] = useState(false);
+  const [editDueDateOpen, setEditDueDateOpen] = useState(false);
 
   return (
     <>
@@ -84,6 +87,7 @@ export default function TaskContextMenu({
         <StatusSubmenu id={task.id} column_id={task.column_id} />
         <AssigneeSubmenu task={task} />
         <PrioritySubmenu task={task} />
+        <DueDateSubmenu task={task} onEditCustomDueDate={() => setEditDueDateOpen(true)} />
         <ContextMenuSeparator />
         <ContextMenuItem onSelect={() => setRenameOpen(true)}>
           <Pencil className="size-4" />
@@ -124,6 +128,13 @@ export default function TaskContextMenu({
         task={task}
         open={renameOpen}
         onOpenChange={setRenameOpen}
+      />
+    )}
+    {editDueDateOpen && (
+      <EditDueDateModal
+        task={task}
+        open={editDueDateOpen}
+        onOpenChange={setEditDueDateOpen}
       />
     )}
     </>

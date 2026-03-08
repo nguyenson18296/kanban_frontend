@@ -45,6 +45,7 @@ export function createUser(overrides: Partial<IUser> = {}): IUser {
 export function createTask(overrides: Partial<ITask> = {}): ITask {
   return {
     id: "task-1",
+    due_date: null,
     column_id: 1,
     title: "Test Task",
     description: "",
