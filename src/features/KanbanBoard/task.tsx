@@ -4,6 +4,8 @@ import { useRouter, useParams } from "@tanstack/react-router";
 import AssigneeDropdown from "@/components/AssigneeDropdown";
 import PriorityDropdown from "@/components/PriorityDropdown";
 import TaskContextMenu from "@/components/TaskContextMenu";
+import DueDateDropdown from "@/components/DueDateDropdown";
+
 import type { ITask, Priority, TAssignee } from "../../types";
 import { cn } from "@/lib/utils";
 import { useUpdateTask } from "./hooks/use-update-task";
@@ -35,7 +37,7 @@ export default function Task({
   columnId,
   ...task
 }: Readonly<TaskProps>) {
-  const { id, title, labels, priority, assignees } = task;
+  const { id, title, labels, priority, assignees, due_date } = task;
   const { ref, isDragging } = useSortable({
     id,
     type: "task",
@@ -49,11 +51,18 @@ export default function Task({
   const { mutate: updateAssigneesMutation } = useUpdateAssignees();
   const updateTaskAssignees = useStoreKanbanBoard((state) => state.updateTaskAssignees);
   const updateTaskPriority = useStoreKanbanBoard((state) => state.updateTaskPriority);
+  const updateTaskDueDate = useStoreKanbanBoard((state) => state.updateTaskDueDate);
 
   const handlePriorityChange = (value: Priority) => {
     if (priority === value) return;
     updateTaskPriority(id, value);
     updateTaskMutation({ id, task: { priority: value } });
+  };
+
+  const handleDueDateChange = (value: string | null) => {
+    if (due_date === value) return;
+    updateTaskDueDate(id, value);
+    updateTaskMutation({ id, task: { due_date: value } });
   };
 
   const handleAssigneeChange = (newAssignees: TAssignee[]) => {
@@ -118,7 +127,15 @@ export default function Task({
           onClick={(e) => e.stopPropagation()}
           className="flex items-center justify-between"
         >
-          <PriorityDropdown priority={priority} onPriorityChange={handlePriorityChange} />
+          <div className="flex items-center">
+            <PriorityDropdown priority={priority} onPriorityChange={handlePriorityChange} />
+            {due_date && (
+              <DueDateDropdown
+                task={{ ...task, column_id: columnId }}
+                onDueDateChange={handleDueDateChange}
+              />
+            )}
+          </div>
           <AssigneeDropdown
             assignees={assignees}
             onAssigneeChange={handleAssigneeChange}

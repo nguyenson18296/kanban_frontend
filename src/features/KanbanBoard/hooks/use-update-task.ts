@@ -7,7 +7,7 @@ export const useUpdateTask = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, task }: { id: string; task: Partial<ITask> }) => updateTask(id, task),
-    onSuccess: () => {
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['board'] });
     },
   });

@@ -9,6 +9,7 @@ interface IStoreKanbanBoard {
   reorderTask: (columnId: number, taskId: string, newPosition: number) => void;
   updateTaskPriority: (taskId: string, priority: Priority) => void;
   updateTaskTitle: (taskId: string, title: string) => void;
+  updateTaskDueDate: (taskId: string, dueDate: string | null) => void;
 }
 
 export const useStoreKanbanBoard = create<IStoreKanbanBoard>((set) => ({
@@ -105,6 +106,20 @@ export const useStoreKanbanBoard = create<IStoreKanbanBoard>((set) => ({
           ...column,
           tasks: column.tasks.map((task) =>
             task.id === taskId ? { ...task, title } : task
+          ),
+        })),
+      },
+    };
+  }),
+  updateTaskDueDate: (taskId: string, dueDate: string | null) => set((state) => {
+    if (!state.kanbanBoard) return state;
+    return {
+      kanbanBoard: {
+        ...state.kanbanBoard,
+        columns: state.kanbanBoard.columns.map((column) => ({
+          ...column,
+          tasks: column.tasks.map((task) =>
+            task.id === taskId ? { ...task, due_date: dueDate } : task
           ),
         })),
       },
