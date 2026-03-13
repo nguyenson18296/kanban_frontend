@@ -1,4 +1,5 @@
 import { useState } from "react";
+
 import {
   Dialog,
   DialogContent,
@@ -15,9 +16,12 @@ import { useStoreKanbanBoard } from "@/stores/use-store-kanban-board";
 import type { ITask } from "@/types";
 
 interface EditDueDateModalProps {
-  task: ITask;
+  // task: ITask;
+  dueDate: ITask['due_date'];
+  taskId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onDueDateChange?: (date: string | null) => void;
 }
 
 function formatInputDate(date: Date | undefined): string {
@@ -29,20 +33,26 @@ function formatInputDate(date: Date | undefined): string {
 }
 
 export default function EditDueDateModal({
-  task,
+  dueDate,
+  taskId,
   open,
   onOpenChange,
+  onDueDateChange,
 }: Readonly<EditDueDateModalProps>) {
   const [draftDate, setDraftDate] = useState<Date | undefined>(
-    task.due_date ? new Date(task.due_date) : undefined
+    dueDate ? new Date(dueDate) : undefined
   );
   const { mutate: updateTaskMutation } = useUpdateTask();
   const updateTaskDueDate = useStoreKanbanBoard(
     (state) => state.updateTaskDueDate
   );
   const handleRemove = () => {
-    updateTaskDueDate(task.id, null);
-    updateTaskMutation({ id: task.id, task: { due_date: null } });
+    updateTaskDueDate(taskId, null);
+    if (onDueDateChange) {
+      onDueDateChange(null);
+    } else {
+      updateTaskMutation({ id: taskId, task: { due_date: null } });
+    }
     onOpenChange(false);
   };
 
@@ -52,8 +62,12 @@ export default function EditDueDateModal({
 
   const handleSave = (date: Date | undefined) => {
     const dueDate = date ? date.toISOString() : null;
-    updateTaskDueDate(task.id, dueDate);
-    updateTaskMutation({ id: task.id, task: { due_date: dueDate } });
+    updateTaskDueDate(taskId, dueDate);
+    if (onDueDateChange) {
+      onDueDateChange(dueDate ?? null);
+    } else {
+      updateTaskMutation({ id: taskId, task: { due_date: dueDate } });
+    }
     onOpenChange(false);
   };
 

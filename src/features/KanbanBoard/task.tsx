@@ -131,7 +131,8 @@ export default function Task({
             <PriorityDropdown priority={priority} onPriorityChange={handlePriorityChange} />
             {due_date && (
               <DueDateDropdown
-                task={{ ...task, column_id: columnId }}
+                dueDate={due_date}
+                taskId={id}
                 onDueDateChange={handleDueDateChange}
               />
             )}

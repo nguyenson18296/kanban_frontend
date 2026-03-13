@@ -132,7 +132,8 @@ export default function TaskContextMenu({
     )}
     {editDueDateOpen && (
       <EditDueDateModal
-        task={task}
+        dueDate={task.due_date}
+        taskId={task.id}
         open={editDueDateOpen}
         onOpenChange={setEditDueDateOpen}
       />

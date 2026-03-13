@@ -1,6 +1,7 @@
 import { forwardRef, useSyncExternalStore } from "react";
 import { Calendar, CalendarX } from "lucide-react";
 
+import { cn } from "@/lib/utils";
 import { formatDate } from "@/utils/date";
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
@@ -60,7 +61,7 @@ const DueDateDropdownTrigger = forwardRef<
     <button
       ref={ref}
       type="button"
-      className={`flex w-full items-center justify-between rounded-md border px-2 py-1 text-[10px] hover:bg-accent ${className ?? ""}`}
+      className={cn("flex w-full items-center justify-between rounded-md border px-2 py-1 text-[10px] hover:bg-accent", className)}
       {...props}
     >
       <span className="flex items-center gap-2">
