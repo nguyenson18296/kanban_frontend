@@ -5,14 +5,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 
 import AssigneeDropdown from "@/components/AssigneeDropdown";
 import PriorityDropdown from "@/components/PriorityDropdown";
 import StatusDropdown from "@/components/StatusDropdown";
 import TaskLabel from "@/components/TaskLabel";
 import TaskLabelDropdown from "@/components/TaskLabelDropdown";
+import DueDateDropdown from "@/components/DueDateDropdown";
 
-import type { ILabel, Priority, TAssignee } from "@/types";
+import type { ILabel, ITask, Priority, TAssignee } from "@/types";
 import { PRIORITY_OPTIONS } from "@/constants/priority";
 import { cn } from "@/lib/utils";
 
@@ -29,11 +31,13 @@ interface TaskDetailSidebarProps {
   id: string;
   column_id: number;
   assignees: TAssignee[];
+  due_date: ITask['due_date'];
   onAssigneeChange: (assignees: TAssignee[]) => void;
   priority: Priority;
   onPriorityChange: (priority: Priority) => void;
   labels: ILabel[];
   onLabelsChange: (labels: ILabel[]) => void;
+  onDueDateChange: (date: string | null) => void;
 }
 
 export default function TaskDetailSidebar({
@@ -41,15 +45,18 @@ export default function TaskDetailSidebar({
   priority,
   id,
   column_id,
+  due_date,
   onAssigneeChange,
   onPriorityChange,
   labels,
   onLabelsChange,
+  onDueDateChange,
 }: Readonly<TaskDetailSidebarProps>) {
   const [localAssignees, setLocalAssignees] = useState<TAssignee[]>(assignees);
   const [localPriority, setLocalPriority] = useState<Priority>(priority);
   const [localLabels, setLocalLabels] = useState<ILabel[]>(labels);
   const [localColumnId, setLocalColumnId] = useState(column_id);
+  const [localDueDate, setLocalDueDate] = useState<ITask['due_date']>(due_date);
 
   const handleAssigneeChange = (assignees: TAssignee[]) => {
     setLocalAssignees(assignees);
@@ -64,6 +71,11 @@ export default function TaskDetailSidebar({
   const handleLabelsChange = (labels: ILabel[]) => {
     setLocalLabels(labels);
     onLabelsChange(labels);
+  };
+
+  const handleDueDateChange = (date: string | null) => {
+    setLocalDueDate(date);
+    onDueDateChange(date);
   };
 
   const assigneeTrigger = (
@@ -133,6 +145,7 @@ export default function TaskDetailSidebar({
           trigger={priorityTrigger}
         />
         <StatusDropdown id={id} column_id={localColumnId} onStatusChange={setLocalColumnId} />
+        <Separator />
         <div>
           <Label>Labels</Label>
           <div className="mt-2 flex items-center flex-wrap gap-1">
@@ -153,6 +166,11 @@ export default function TaskDetailSidebar({
               onLabelsChange={handleLabelsChange}
             />
           </div>
+        </div>
+        <Separator />
+        <div>
+          <Label className="my-2">Due date</Label>
+          <DueDateDropdown dueDate={localDueDate} taskId={id} onDueDateChange={handleDueDateChange} triggerClassName="w-[100px] h-8" />
         </div>
       </CardContent>
     </Card>

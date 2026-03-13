@@ -52,6 +52,14 @@ export default function TaskDetail() {
     });
   };
 
+  const handleDueDateChange = (date: string | null) => {
+    if (!task) return;
+    updateTaskMutation({
+      id: task.id,
+      task: { due_date: date },
+    });
+  };
+
   if (isLoading) {
     return <div className="p-8 text-sm text-muted-foreground">Loading task...</div>;
   }
@@ -81,6 +89,8 @@ export default function TaskDetail() {
           id={task.id}
           column_id={task.column_id}
           labels={task.labels}
+          due_date={task.due_date}
+          onDueDateChange={handleDueDateChange}
           onLabelsChange={handleLabelsChange}
         />
       </div>

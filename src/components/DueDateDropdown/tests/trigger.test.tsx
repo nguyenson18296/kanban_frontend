@@ -57,6 +57,15 @@ describe("DueDateDropdownTrigger", () => {
     expect(button).toHaveAttribute("aria-expanded", "true");
   });
 
+  it("merges className and allows overriding default width", () => {
+    render(<DueDateDropdownTrigger dueDate={null} className="w-[150px] h-8" />);
+
+    const button = screen.getByRole("button");
+    // cn() (tailwind-merge) should resolve w-[150px] over the default w-full
+    expect(button).toHaveClass("w-[150px]", "h-8");
+    expect(button).not.toHaveClass("w-full");
+  });
+
   it("displays formatted date when dueDate is provided", () => {
     render(<DueDateDropdownTrigger dueDate={addDays(10)} />);
 

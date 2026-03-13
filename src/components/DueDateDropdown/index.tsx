@@ -13,17 +13,19 @@ import DueDateDropdownTrigger from "./trigger";
 
 import type { ITask } from "@/types";
 interface DueDateDropdownProps {
-  task: ITask;
+  dueDate: ITask['due_date'];
+  taskId: string;
   onDueDateChange: (date: string | null) => void;
-  trigger?: React.ReactNode;
+  triggerClassName?: string;
 }
 
 export default function DueDateDropdown({
-  task,
+  dueDate,
+  taskId,
   onDueDateChange,
+  triggerClassName,
 }: Readonly<DueDateDropdownProps>) {
   const [editDueDateOpen, setEditDueDateOpen] = useState(false);
-  const dueDate = task.due_date ? new Date(task.due_date) : null;
   
   const handleSelect = (getDate: () => Date | null) => {
     const date = getDate();
@@ -34,15 +36,18 @@ export default function DueDateDropdown({
     <>
       {editDueDateOpen && (
         <EditDueDateModal
-          task={task}
+          dueDate={dueDate}
+          taskId={taskId}
           open={editDueDateOpen}
           onOpenChange={setEditDueDateOpen}
+          onDueDateChange={onDueDateChange}
         />
       )}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <DueDateDropdownTrigger
-            dueDate={dueDate ? dueDate.toISOString() : null}
+            dueDate={dueDate}
+            className={triggerClassName}
           />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-48">
