@@ -9,9 +9,10 @@ import type { ITask } from "@/types";
 interface DueDateSubmenuProps {
   task: ITask;
   onEditCustomDueDate: (task: ITask) => void;
+  onTaskUpdate?: (partial: Partial<ITask>) => void;
 }
 
-export default function DueDateSubmenu({ task, onEditCustomDueDate }: Readonly<DueDateSubmenuProps>) {
+export default function DueDateSubmenu({ task, onEditCustomDueDate, onTaskUpdate }: Readonly<DueDateSubmenuProps>) {
   const { mutate: updateTaskMutation } = useUpdateTask();
   const updateTaskDueDate = useStoreKanbanBoard((state) => state.updateTaskDueDate);
 
@@ -20,6 +21,7 @@ export default function DueDateSubmenu({ task, onEditCustomDueDate }: Readonly<D
     if (due_date) {
       updateTaskDueDate(task.id, due_date);
       updateTaskMutation({ id: task.id, task: { due_date } });
+      onTaskUpdate?.({ due_date });
     }
   };
 

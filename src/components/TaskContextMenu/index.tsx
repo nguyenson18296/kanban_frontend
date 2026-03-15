@@ -69,12 +69,14 @@ interface TaskContextMenuProps {
   task: ITask;
   children: ReactNode;
   onDelete?: (task: ITask) => void;
+  onTaskUpdate?: (partial: Partial<ITask>) => void;
 }
 
 export default function TaskContextMenu({
   task,
   children,
   onDelete,
+  onTaskUpdate,
 }: Readonly<TaskContextMenuProps>) {
   const [renameOpen, setRenameOpen] = useState(false);
   const [editDueDateOpen, setEditDueDateOpen] = useState(false);
@@ -84,10 +86,10 @@ export default function TaskContextMenu({
     <ContextMenu>
       <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
       <ContextMenuContent className="w-48">
-        <StatusSubmenu id={task.id} column_id={task.column_id} />
-        <AssigneeSubmenu task={task} />
-        <PrioritySubmenu task={task} />
-        <DueDateSubmenu task={task} onEditCustomDueDate={() => setEditDueDateOpen(true)} />
+        <StatusSubmenu id={task.id} column_id={task.column_id} onTaskUpdate={onTaskUpdate} />
+        <AssigneeSubmenu task={task} onTaskUpdate={onTaskUpdate} />
+        <PrioritySubmenu task={task} onTaskUpdate={onTaskUpdate} />
+        <DueDateSubmenu task={task} onEditCustomDueDate={() => setEditDueDateOpen(true)} onTaskUpdate={onTaskUpdate} />
         <ContextMenuSeparator />
         <ContextMenuItem onSelect={() => setRenameOpen(true)}>
           <Pencil className="size-4" />

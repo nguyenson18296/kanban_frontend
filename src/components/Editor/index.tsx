@@ -10,6 +10,7 @@ interface EditorProps {
   placeholder?: string;
   editable?: boolean;
   className?: string;
+  editorClassName?: string;
   onChange?: (html: string) => void;
 }
 
@@ -18,6 +19,7 @@ export default function Editor({
   placeholder = "Write something...",
   editable = true,
   className,
+  editorClassName,
   onChange,
 }: Readonly<EditorProps>) {
   const editor = useEditor({
@@ -31,6 +33,12 @@ export default function Editor({
         placeholder,
       }),
     ],
+    // Note: class is captured at initialization time and won't react to dynamic changes.
+    editorProps: {
+      attributes: {
+        class: cn("tiptap", editorClassName),
+      },
+    },
     content: description,
     editable,
     onUpdate: ({ editor: e }) => {
