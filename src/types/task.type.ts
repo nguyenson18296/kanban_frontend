@@ -12,6 +12,7 @@ interface ITask {
   description: string;
   status: number;
   priority: Priority;
+  position: number;
   ticket_id: string;
   labels: ILabel[];
   assignees: TAssignee[];

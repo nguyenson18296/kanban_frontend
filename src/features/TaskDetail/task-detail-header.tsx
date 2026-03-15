@@ -13,9 +13,11 @@ export default function TaskDetailHeader({ title, ticket_id, created_at, creator
         <Badge variant="outline" className="p-1.5 px-2">
           {ticket_id}
         </Badge>
-        <p className="text-sm text-muted-foreground">
-          Created by <span className="text-[#5a5cf2]">{creator.full_name}</span> on {created_at}
-        </p>
+        {creator && (
+          <p className="text-sm text-muted-foreground">
+            Created by <span className="text-[#5a5cf2]">{creator.full_name}</span> on {created_at}
+          </p>
+        )}
       </div>
     </div>
   );

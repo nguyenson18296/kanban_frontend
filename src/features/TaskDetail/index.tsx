@@ -9,6 +9,8 @@ import { useUpdateTaskLabels } from "./hooks/use-update-task-labels";
 import TaskDetailHeader from "./task-detail-header";
 import TaskDetailDescription from "./task-detail-description";
 import TaskDetailSidebar from "./task-detail-sidebar";
+import Subtask from "./subtask";
+
 import type { ILabel, Priority, TAssignee } from "@/types";
 
 export default function TaskDetail() {
@@ -71,13 +73,14 @@ export default function TaskDetail() {
   return (
     <div className="flex gap-4">
       <div className="w-3/4">
-      <TaskDetailHeader
-        title={task.title}
-        ticket_id={task.ticket_id}
-        created_at={task.created_at}
-        creator={task.creator}
-      />
-      <TaskDetailDescription key={task.id} id={task.id} description={task.description} />
+        <TaskDetailHeader
+          title={task.title}
+          ticket_id={task.ticket_id}
+          created_at={task.created_at}
+          creator={task.creator}
+        />
+        <TaskDetailDescription key={task.id} id={task.id} description={task.description} />
+        <Subtask taskId={task.id} />
       </div>
       <div className="w-1/4">
         <TaskDetailSidebar

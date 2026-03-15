@@ -51,6 +51,7 @@ export function createTask(overrides: Partial<ITask> = {}): ITask {
     description: "",
     status: 0,
     priority: "medium",
+    position: 0,
     ticket_id: "T-1",
     labels: [],
     assignees: [],

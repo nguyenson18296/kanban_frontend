@@ -9,9 +9,10 @@ import { useStoreKanbanBoard } from "@/stores/use-store-kanban-board";
 
 interface PrioritySubmenuProps {
   task: ITask;
+  onTaskUpdate?: (partial: Partial<ITask>) => void;
 }
 
-export default function PrioritySubmenu({ task }: Readonly<PrioritySubmenuProps>) {
+export default function PrioritySubmenu({ task, onTaskUpdate }: Readonly<PrioritySubmenuProps>) {
   const { mutate: updateTaskMutation } = useUpdateTask();
   const updateTaskPriority = useStoreKanbanBoard((state) => state.updateTaskPriority);
 
@@ -19,6 +20,7 @@ export default function PrioritySubmenu({ task }: Readonly<PrioritySubmenuProps>
     if (task.priority === value) return;
     updateTaskPriority(task.id, value);
     updateTaskMutation({ id: task.id, task: { priority: value } });
+    onTaskUpdate?.({ priority: value });
   };
 
   return (

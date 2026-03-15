@@ -11,14 +11,16 @@ import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 
 interface AssigneeSubmenuProps {
   task: ITask;
+  onTaskUpdate?: (partial: Partial<ITask>) => void;
 }
 
-export default function AssigneeSubmenu({ task }: Readonly<AssigneeSubmenuProps>) {
+export default function AssigneeSubmenu({ task, onTaskUpdate }: Readonly<AssigneeSubmenuProps>) {
   const [search, setSearch] = useState("");
   const [draftAssignedIds, setDraftAssignedIds] = useState(() => new Set(task.assignees.map((a) => a.id)));
   const users = useStoreUsersList((s) => s.users);
   const { mutate: updateAssigneesMutation } = useUpdateAssignees();
   const updateStoreAssignees = useStoreKanbanBoard((s) => s.updateTaskAssignees);
+
 
   // Focus the search input when the submenu opens.
   // SubContent unmounts on close, so this fires on each open.
@@ -65,6 +67,7 @@ export default function AssigneeSubmenu({ task }: Readonly<AssigneeSubmenuProps>
       [...draftAssignedIds].some((id) => !currentIds.has(id));
     if (changed) {
       handleUpdateAssignees();
+      onTaskUpdate?.({ assignees: users.filter((u) => draftAssignedIds.has(u.id)).map(({ id, full_name, avatar_url }) => ({ id, full_name, avatar_url })) });
     }
   };
 

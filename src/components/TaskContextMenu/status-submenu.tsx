@@ -3,14 +3,15 @@ import { ChartPie } from "lucide-react";
 
 import { useStoreKanbanBoard } from "@/stores/use-store-kanban-board";
 import { useMoveTaskToColumn } from "@/features/KanbanBoard/hooks/use-move-task-to-column";
+import type { ITask } from "@/types";
 
 interface StatusSubmenuProps {
-  // task: ITask;
   id: string;
   column_id: number;
+  onTaskUpdate?: (partial: Partial<ITask>) => void;
 }
 
-export default function StatusSubmenu({ id, column_id }: Readonly<StatusSubmenuProps>) {
+export default function StatusSubmenu({ id, column_id, onTaskUpdate }: Readonly<StatusSubmenuProps>) {
   const board = useStoreKanbanBoard((state) => state.kanbanBoard);
   const moveTaskInStore = useStoreKanbanBoard((state) => state.moveTask);
   const { mutate: moveTaskToColumnMutation } = useMoveTaskToColumn();
@@ -18,6 +19,7 @@ export default function StatusSubmenu({ id, column_id }: Readonly<StatusSubmenuP
   const moveTask = (columnId: number) => {
     moveTaskInStore(id, column_id, columnId, 0);
     moveTaskToColumnMutation({ id, columnId, position: 0 });
+    onTaskUpdate?.({ column_id: columnId });
   };
 
   const columns = board?.columns ?? [];
