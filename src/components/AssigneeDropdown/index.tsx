@@ -87,7 +87,7 @@ export default function AssigneeDropdown({
 
   const defaultTrigger =
     assignees.length > 0 ? (
-      <button type="button" className="cursor-pointer pt-4 pb-2">
+      <button type="button" className="cursor-pointer py-2">
         <AvatarGroupCustom visibleCount={3} avatars={assignees} />
       </button>
     ) : (

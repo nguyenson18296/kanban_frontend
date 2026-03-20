@@ -17,6 +17,8 @@ import DueDateDropdown from "@/components/DueDateDropdown";
 import type { ILabel, ITask, Priority, TAssignee } from "@/types";
 import { PRIORITY_OPTIONS } from "@/constants/priority";
 import { cn } from "@/lib/utils";
+import { useStoreKanbanBoard } from "@/stores/use-store-kanban-board";
+import { useMoveTaskToColumn } from "@/features/KanbanBoard/hooks/use-move-task-to-column";
 
 function getInitials(name: string): string {
   return name
@@ -57,6 +59,8 @@ export default function TaskDetailSidebar({
   const [localLabels, setLocalLabels] = useState<ILabel[]>(labels);
   const [localColumnId, setLocalColumnId] = useState(column_id);
   const [localDueDate, setLocalDueDate] = useState<ITask['due_date']>(due_date);
+  const moveTaskInStore = useStoreKanbanBoard((state) => state.moveTask);
+  const { mutate: moveTaskToColumnMutation } = useMoveTaskToColumn();
 
   const handleAssigneeChange = (assignees: TAssignee[]) => {
     setLocalAssignees(assignees);
@@ -76,6 +80,12 @@ export default function TaskDetailSidebar({
   const handleDueDateChange = (date: string | null) => {
     setLocalDueDate(date);
     onDueDateChange(date);
+  };
+
+  const handleStatusChange = (columnId: number) => {
+    moveTaskInStore(id, localColumnId, columnId, 0);
+    moveTaskToColumnMutation({ id, columnId, position: 0 });
+    setLocalColumnId(columnId);
   };
 
   const assigneeTrigger = (
@@ -144,7 +154,7 @@ export default function TaskDetailSidebar({
           onPriorityChange={handlePriorityChange}
           trigger={priorityTrigger}
         />
-        <StatusDropdown id={id} column_id={localColumnId} onStatusChange={setLocalColumnId} />
+        <StatusDropdown column_id={localColumnId} onStatusChange={handleStatusChange} />
         <Separator />
         <div>
           <Label>Labels</Label>
