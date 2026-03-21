@@ -1,12 +1,13 @@
 import type { ILabel } from "@/types";
 
-interface StackedLabelsProps {
+interface StackedLabelsProps extends React.ComponentPropsWithoutRef<"button"> {
   labels: ILabel[];
+  ref?: React.Ref<HTMLButtonElement>;
 }
 
-export default function StackedLabels({ labels }: Readonly<StackedLabelsProps>) {
+export default function StackedLabels({ labels, ref, ...props }: Readonly<StackedLabelsProps>) {
   return (
-    <button type="button" className="flex items-center">
+    <button type="button" ref={ref} className="flex items-center" {...props}>
       {labels.map((label, index) => (
         <span
           key={label.id}

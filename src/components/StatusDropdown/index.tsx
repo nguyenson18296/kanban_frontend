@@ -7,23 +7,19 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useStoreKanbanBoard } from "@/stores/use-store-kanban-board";
-import { useMoveTaskToColumn } from "@/features/KanbanBoard/hooks/use-move-task-to-column";
+
 interface StatusDropdownProps {
-  id: string;
   column_id: number;
   trigger?: React.ReactNode;
   onStatusChange?: (columnId: number) => void;
 }
 
 export default function StatusDropdown({
-  id,
   column_id,
   trigger,
   onStatusChange,
 }: Readonly<StatusDropdownProps>) {
   const board = useStoreKanbanBoard((state) => state.kanbanBoard);
-  const moveTaskInStore = useStoreKanbanBoard((state) => state.moveTask);
-  const { mutate: moveTaskToColumnMutation } = useMoveTaskToColumn();
 
   const columns = board?.columns ?? [];
   const currentColumn =
@@ -31,8 +27,6 @@ export default function StatusDropdown({
 
   const handleStatusChange = (columnId: number) => {
     if (columnId === column_id) return;
-    moveTaskInStore(id, column_id, columnId, 0);
-    moveTaskToColumnMutation({ id, columnId, position: 0 });
     onStatusChange?.(columnId);
   };
 

@@ -80,7 +80,7 @@ export default function TaskDetail() {
           creator={task.creator}
         />
         <TaskDetailDescription key={task.id} id={task.id} description={task.description} />
-        <Subtask taskId={task.id} />
+        <Subtask taskId={task.id} teamId={task.creator?.team_id ?? 0} />
       </div>
       <div className="w-1/4">
         <TaskDetailSidebar

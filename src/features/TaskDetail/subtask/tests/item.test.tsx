@@ -8,6 +8,13 @@ import type { ILabel } from "@/types";
 
 // --- Mocks ---
 
+vi.mock("@tanstack/react-router", () => ({
+  useParams: () => ({ projectId: "proj-1", taskId: "task-1" }),
+  Link: ({ children, ...props }: { children: React.ReactNode; to: string; params: Record<string, string>; className?: string }) => (
+    <a href={props.to} data-testid="subtask-link">{children}</a>
+  ),
+}));
+
 const mockUpdateTaskMutate = vi.fn();
 const mockUpdateLabelsMutate = vi.fn();
 

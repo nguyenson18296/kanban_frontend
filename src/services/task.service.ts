@@ -1,5 +1,5 @@
 import { httpClient } from "@/lib/http-client";
-import type { ITask } from "@/types";
+import type { ITask, ICreateTaskDto } from "@/types/task.type";
 
 export const getTasks = () => {
   return httpClient.get<ITask[]>('/tasks');
@@ -13,7 +13,7 @@ export const createTask = (task: ITask) => {
   return httpClient.post<ITask>('/tasks', task);
 }
 
-export const createSubtask = (taskId: string, subtask: ITask) => {
+export const createSubtask = (taskId: string, subtask: ICreateTaskDto) => {
   return httpClient.post<ITask>(`/tasks/${taskId}/subtasks`, subtask);
 }
 

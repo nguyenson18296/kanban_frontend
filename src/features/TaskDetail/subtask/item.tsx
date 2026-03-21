@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link, useParams } from "@tanstack/react-router";
 
 import { Checkbox } from "@/components/ui/checkbox";
 
@@ -19,67 +20,66 @@ interface SubtaskItemProps {
 }
 
 export default function SubtaskItem({ task }: Readonly<SubtaskItemProps>) {
-  const [columnId, setColumnId] = useState(task.column_id);
-  const [assignees, setAssignees] = useState(task.assignees);
-  const [dueDate, setDueDate] = useState(task.due_date);
-  const [labels, setLabels] = useState(task.labels);
-  const [priority, setPriority] = useState(task.priority);
+  const [overrides, setOverrides] = useState<Partial<ITask>>({});
+  const merged = { ...task, ...overrides };
+
+  const { projectId } = useParams({ from: "/_authenticated/projects/$projectId/tasks/$taskId" });
 
   const { mutate: updateTaskMutation } = useUpdateTask();
   const { mutate: updateTaskLabelsMutation } = useUpdateTaskLabels();
 
   const statusColor = useStoreKanbanBoard(
-    (state) => state.kanbanBoard?.columns.find((col) => col.id === columnId)?.color,
+    (state) => state.kanbanBoard?.columns.find((col) => col.id === merged.column_id)?.color,
   );
 
   const handleDueDateChange = (date: string | null) => {
-    if (dueDate === date) return;
-    setDueDate(date);
+    if (merged.due_date === date) return;
+    setOverrides((prev) => ({ ...prev, due_date: date }));
     updateTaskMutation({ id: task.id, task: { due_date: date } });
   };
 
   const handleLabelsChange = (newLabels: ILabel[]) => {
-    const prevIds = labels.map((l) => l.id).sort().join(",");
+    const prevIds = merged.labels.map((l) => l.id).sort().join(",");
     const nextIds = newLabels.map((l) => l.id).sort().join(",");
     if (prevIds === nextIds) return;
-    setLabels(newLabels);
+    setOverrides((prev) => ({ ...prev, labels: newLabels }));
     updateTaskLabelsMutation({ id: task.id, label_ids: newLabels.map((l) => l.id) });
   };
 
   const handleTaskUpdate = (partial: Partial<ITask>) => {
-    if (partial.column_id !== undefined) setColumnId(partial.column_id);
-    if (partial.assignees !== undefined) setAssignees(partial.assignees);
-    if (partial.due_date !== undefined) setDueDate(partial.due_date);
-    if (partial.labels !== undefined) setLabels(partial.labels);
-    if (partial.priority !== undefined) setPriority(partial.priority);
+    setOverrides((prev) => ({ ...prev, ...partial }));
   };
 
   return (
     <TaskContextMenu
-      task={{ ...task, column_id: columnId, assignees, due_date: dueDate, labels, priority }}
+      task={merged}
       onTaskUpdate={handleTaskUpdate}
     >
-      <div className="grid grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-2">
+      <div className="grid grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-2 hover:bg-[#e5ebf7] data-[state=open]:bg-[#e5ebf7] p-2 rounded-md">
         <Checkbox />
         <span
           className="size-3 rounded-full"
           style={{ backgroundColor: statusColor }}
         />
-        <span className="truncate text-sm font-medium text-[#1b1b1b]">
+        <Link
+          to="/projects/$projectId/tasks/$taskId"
+          params={{ projectId, taskId: task.ticket_id }}
+          className="truncate text-sm font-medium text-[#1b1b1b] hover:underline"
+        >
           {task.title}
-        </span>
+        </Link>
         <div className="flex items-center gap-2">
           <TaskLabelDropdown
-            selectedLabels={labels}
+            selectedLabels={merged.labels}
             onLabelsChange={handleLabelsChange}
             trigger={
-              labels.length > 0 ? (
-                <StackedLabels labels={labels} />
+              merged.labels.length > 0 ? (
+                <StackedLabels labels={merged.labels} />
               ) : undefined
             }
           />
-          <DueDateDropdown dueDate={dueDate} taskId={task.id} onDueDateChange={handleDueDateChange} />
-          <AvatarGroupCustom avatars={assignees} />
+          <DueDateDropdown dueDate={merged.due_date} taskId={task.id} onDueDateChange={handleDueDateChange} />
+          <AvatarGroupCustom avatars={merged.assignees} />
         </div>
       </div>
     </TaskContextMenu>

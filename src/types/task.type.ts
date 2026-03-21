@@ -22,4 +22,17 @@ interface ITask {
   updated_at: string;
 }
 
-export type { TAssignee, ITask, Priority };
+interface ICreateTaskDto {
+  title: string;
+  description: string;
+  status: "open" | "in_progress" | "in_review" | "done" | "cancelled";
+  priority: Priority;
+  column_id: number;
+  position: number;
+  team_id: number;
+  due_date: string | null;
+  assignee_ids: string[];
+  label_ids: string[];
+}
+
+export type { TAssignee, ITask, Priority, ICreateTaskDto };
