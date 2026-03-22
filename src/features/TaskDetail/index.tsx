@@ -75,9 +75,8 @@ export default function TaskDetail() {
       <div className="w-3/4">
         <TaskDetailHeader
           title={task.title}
-          ticket_id={task.ticket_id}
-          created_at={task.created_at}
-          creator={task.creator}
+          projectId={projectId}
+          parent={task.parent}
         />
         <TaskDetailDescription key={task.id} id={task.id} description={task.description} />
         <Subtask taskId={task.id} teamId={task.creator?.team_id ?? 0} />

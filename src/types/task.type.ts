@@ -20,6 +20,12 @@ interface ITask {
   creator: IUser;
   created_at: string;
   updated_at: string;
+  parent: {
+    id: string;
+    column_id: number;
+    title: string;
+    ticket_id: string;
+  } | null;
 }
 
 interface ICreateTaskDto {

@@ -113,6 +113,22 @@ vi.mock("@/components/ui/checkbox", () => ({
   Checkbox: () => <input type="checkbox" data-testid="checkbox" />,
 }));
 
+let mockSortableOverrides: Record<string, unknown> = {};
+
+vi.mock("@dnd-kit/react/sortable", () => ({
+  useSortable: () => ({
+    ref: () => {},
+    isDragging: false,
+    isDropTarget: false,
+    sortable: { index: 0, initialIndex: 0 },
+    ...mockSortableOverrides,
+  }),
+}));
+
+vi.mock("@dnd-kit/abstract", () => ({
+  CollisionPriority: { Low: 0 },
+}));
+
 // --- Helpers ---
 
 function createLabel(id: string, name: string, color: string): ILabel {
@@ -127,25 +143,26 @@ afterEach(() => {
   capturedOnTaskUpdate = undefined;
   capturedOnDueDateChange = undefined;
   capturedOnLabelsChange = undefined;
+  mockSortableOverrides = {};
 });
 
 describe("SubtaskItem", () => {
   describe("rendering", () => {
     it("renders the task title", () => {
-      render(<SubtaskItem task={createTask({ title: "Fix login bug" })} />);
+      render(<SubtaskItem order={0} task={createTask({ title: "Fix login bug" })} />);
 
       expect(screen.getByText("Fix login bug")).toBeInTheDocument();
     });
 
     it("renders a checkbox", () => {
-      render(<SubtaskItem task={createTask()} />);
+      render(<SubtaskItem order={0} task={createTask()} />);
 
       expect(screen.getByTestId("checkbox")).toBeInTheDocument();
     });
 
     it("renders the status color dot based on column_id", () => {
       const { container } = render(
-        <SubtaskItem task={createTask({ column_id: 2 })} />,
+        <SubtaskItem order={0} task={createTask({ column_id: 2 })} />,
       );
 
       const dot = container.querySelector(".rounded-full.size-3");
@@ -159,13 +176,13 @@ describe("SubtaskItem", () => {
           createAssignee("u-2", "Bob"),
         ],
       });
-      render(<SubtaskItem task={task} />);
+      render(<SubtaskItem order={0} task={task} />);
 
       expect(screen.getByText("2 avatars")).toBeInTheDocument();
     });
 
     it("renders due date dropdown", () => {
-      render(<SubtaskItem task={createTask({ due_date: "2026-03-15T00:00:00.000Z" })} />);
+      render(<SubtaskItem order={0} task={createTask({ due_date: "2026-03-15T00:00:00.000Z" })} />);
 
       expect(screen.getByTestId("due-date")).toHaveTextContent("2026-03-15");
     });
@@ -177,7 +194,7 @@ describe("SubtaskItem", () => {
           createLabel("l-2", "Feature", "#3b82f6"),
         ],
       });
-      render(<SubtaskItem task={task} />);
+      render(<SubtaskItem order={0} task={task} />);
 
       expect(screen.getByText("Bug")).toBeInTheDocument();
       expect(screen.getByText("Feature")).toBeInTheDocument();
@@ -187,7 +204,7 @@ describe("SubtaskItem", () => {
   describe("status change", () => {
     it("updates status color when onTaskUpdate is called with column_id", () => {
       const { container } = render(
-        <SubtaskItem task={createTask({ column_id: 1 })} />,
+        <SubtaskItem order={0} task={createTask({ column_id: 1 })} />,
       );
 
       const dot = container.querySelector(".rounded-full.size-3");
@@ -202,7 +219,7 @@ describe("SubtaskItem", () => {
 
   describe("due date change", () => {
     it("calls updateTaskMutation when due date changes", () => {
-      render(<SubtaskItem task={createTask({ id: "task-42", due_date: null })} />);
+      render(<SubtaskItem order={0} task={createTask({ id: "task-42", due_date: null })} />);
 
       act(() => capturedOnDueDateChange?.("2026-04-01T00:00:00.000Z"));
 
@@ -214,7 +231,7 @@ describe("SubtaskItem", () => {
 
     it("skips mutation when due date is unchanged", () => {
       const existingDate = "2026-03-15T00:00:00.000Z";
-      render(<SubtaskItem task={createTask({ due_date: existingDate })} />);
+      render(<SubtaskItem order={0} task={createTask({ due_date: existingDate })} />);
 
       act(() => capturedOnDueDateChange?.(existingDate));
 
@@ -224,6 +241,7 @@ describe("SubtaskItem", () => {
     it("allows removing due date by passing null", () => {
       render(
         <SubtaskItem
+          order={0}
           task={createTask({ id: "task-42", due_date: "2026-03-15T00:00:00.000Z" })}
         />,
       );
@@ -237,7 +255,7 @@ describe("SubtaskItem", () => {
     });
 
     it("optimistically updates displayed due date", () => {
-      render(<SubtaskItem task={createTask({ due_date: null })} />);
+      render(<SubtaskItem order={0} task={createTask({ due_date: null })} />);
 
       expect(screen.getByTestId("due-date")).toHaveTextContent("No date");
 
@@ -249,7 +267,7 @@ describe("SubtaskItem", () => {
 
   describe("labels change", () => {
     it("calls updateTaskLabelsMutation when labels change", () => {
-      render(<SubtaskItem task={createTask({ id: "task-42", labels: [] })} />);
+      render(<SubtaskItem order={0} task={createTask({ id: "task-42", labels: [] })} />);
 
       const newLabels = [createLabel("l-1", "Bug", "#ef4444")];
       act(() => capturedOnLabelsChange?.(newLabels));
@@ -262,7 +280,7 @@ describe("SubtaskItem", () => {
 
     it("skips mutation when label IDs are unchanged", () => {
       const existingLabels = [createLabel("l-1", "Bug", "#ef4444")];
-      render(<SubtaskItem task={createTask({ labels: existingLabels })} />);
+      render(<SubtaskItem order={0} task={createTask({ labels: existingLabels })} />);
 
       const sameLabels = [createLabel("l-1", "Bug", "#ef4444")];
       act(() => capturedOnLabelsChange?.(sameLabels));
@@ -272,7 +290,7 @@ describe("SubtaskItem", () => {
 
     it("fires mutation when same count but different IDs", () => {
       const existingLabels = [createLabel("l-1", "Bug", "#ef4444")];
-      render(<SubtaskItem task={createTask({ id: "task-42", labels: existingLabels })} />);
+      render(<SubtaskItem order={0} task={createTask({ id: "task-42", labels: existingLabels })} />);
 
       const differentLabels = [createLabel("l-2", "Feature", "#3b82f6")];
       act(() => capturedOnLabelsChange?.(differentLabels));
@@ -284,7 +302,7 @@ describe("SubtaskItem", () => {
     });
 
     it("optimistically updates displayed label count", () => {
-      render(<SubtaskItem task={createTask({ labels: [] })} />);
+      render(<SubtaskItem order={0} task={createTask({ labels: [] })} />);
 
       expect(screen.getByTestId("label-count")).toHaveTextContent("0");
 
@@ -300,7 +318,7 @@ describe("SubtaskItem", () => {
 
   describe("assignees change", () => {
     it("updates displayed avatars when onTaskUpdate is called with assignees", () => {
-      render(<SubtaskItem task={createTask({ assignees: [] })} />);
+      render(<SubtaskItem order={0} task={createTask({ assignees: [] })} />);
 
       expect(screen.getByText("0 avatars")).toBeInTheDocument();
 
@@ -314,6 +332,55 @@ describe("SubtaskItem", () => {
       );
 
       expect(screen.getByText("2 avatars")).toBeInTheDocument();
+    });
+  });
+
+  describe("drag and drop visuals", () => {
+    it("applies opacity-50 when dragging", () => {
+      mockSortableOverrides = { isDragging: true };
+      const { container } = render(
+        <SubtaskItem order={0} task={createTask()} />,
+      );
+
+      const row = container.querySelector("[class*='opacity-50']");
+      expect(row).toBeInTheDocument();
+    });
+
+    it("shows top drop indicator when dropping above", () => {
+      mockSortableOverrides = {
+        isDropTarget: true,
+        sortable: { index: 0, initialIndex: 2 },
+      };
+      const { container } = render(
+        <SubtaskItem order={0} task={createTask()} />,
+      );
+
+      const row = container.querySelector(".relative");
+      expect(row?.className).toContain("before:");
+    });
+
+    it("shows bottom drop indicator when dropping below", () => {
+      mockSortableOverrides = {
+        isDropTarget: true,
+        sortable: { index: 2, initialIndex: 0 },
+      };
+      const { container } = render(
+        <SubtaskItem order={0} task={createTask()} />,
+      );
+
+      const row = container.querySelector(".relative");
+      expect(row?.className).toContain("after:");
+    });
+
+    it("does not show indicators when not a drop target", () => {
+      mockSortableOverrides = { isDropTarget: false };
+      const { container } = render(
+        <SubtaskItem order={0} task={createTask()} />,
+      );
+
+      const row = container.querySelector(".relative");
+      expect(row?.className).not.toContain("before:");
+      expect(row?.className).not.toContain("after:");
     });
   });
 });

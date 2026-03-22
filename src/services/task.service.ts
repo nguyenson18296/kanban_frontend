@@ -13,18 +13,6 @@ export const createTask = (task: ITask) => {
   return httpClient.post<ITask>('/tasks', task);
 }
 
-export const createSubtask = (taskId: string, subtask: ICreateTaskDto) => {
-  return httpClient.post<ITask>(`/tasks/${taskId}/subtasks`, subtask);
-}
-
-export const getSubtasks = (taskId: string) => {
-  return httpClient.get<{
-    data: ITask[],
-    success: boolean,
-    message: string,
-  }>(`/tasks/${taskId}/subtasks`);
-}
-
 export const updateTask = (id: string, task: Partial<ITask>) => {
   return httpClient.patch<ITask>(`/tasks/${id}`, task);
 }
@@ -43,4 +31,22 @@ export const updateTaskAssignees = (id: string, assignee_ids: string[]) => {
 
 export const updateTaskLabels = (id: string, label_ids: string[]) => {
   return httpClient.patch<ITask>(`/tasks/${id}`, { label_ids });
+}
+
+
+// Subtask endpoints
+export const createSubtask = (taskId: string, subtask: ICreateTaskDto) => {
+  return httpClient.post<ITask>(`/tasks/${taskId}/subtasks`, subtask);
+}
+
+export const getSubtasks = (taskId: string) => {
+  return httpClient.get<{
+    data: ITask[],
+    success: boolean,
+    message: string,
+  }>(`/tasks/${taskId}/subtasks`);
+}
+
+export const reorderSubtask = (taskId: string, subtaskId: string, position: number) => {
+  return httpClient.patch<ITask>(`/tasks/${taskId}/subtasks/${subtaskId}/reorder`, { position });
 }

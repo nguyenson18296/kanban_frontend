@@ -58,6 +58,7 @@ export function createTask(overrides: Partial<ITask> = {}): ITask {
     creator: createUser(),
     created_at: "",
     updated_at: "",
+    parent: null,
     ...overrides,
   };
 }
