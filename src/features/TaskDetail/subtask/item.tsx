@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { Link, useParams } from "@tanstack/react-router";
+import { useSortable } from "@dnd-kit/react/sortable";
+import { CollisionPriority } from "@dnd-kit/abstract";
 
 import { Checkbox } from "@/components/ui/checkbox";
 
@@ -14,12 +16,29 @@ import { useStoreKanbanBoard } from "@/stores/use-store-kanban-board";
 import { useUpdateTask } from "@/features/KanbanBoard/hooks/use-update-task";
 import { useUpdateTaskLabels } from "../hooks/use-update-task-labels";
 import type { ILabel } from "@/types";
+import { cn } from "@/lib/utils";
 
 interface SubtaskItemProps {
   task: ITask;
+  order: number;
 }
 
-export default function SubtaskItem({ task }: Readonly<SubtaskItemProps>) {
+export default function SubtaskItem({ task, order }: Readonly<SubtaskItemProps>) {
+  const { ref, isDragging, isDropTarget, sortable } = useSortable({
+    id: task.id,
+    type: "task",
+    group: "subtasks",
+    index: order,
+    transition: {
+      duration: 200,
+      easing: "ease-in-out",
+    },
+    collisionPriority: CollisionPriority.Low,
+  });
+
+  const isDropAbove = isDropTarget && sortable.index < sortable.initialIndex;
+  const isDropBelow = isDropTarget && sortable.index >= sortable.initialIndex;
+
   const [overrides, setOverrides] = useState<Partial<ITask>>({});
   const merged = { ...task, ...overrides };
 
@@ -55,31 +74,38 @@ export default function SubtaskItem({ task }: Readonly<SubtaskItemProps>) {
       task={merged}
       onTaskUpdate={handleTaskUpdate}
     >
-      <div className="grid grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-2 hover:bg-[#e5ebf7] data-[state=open]:bg-[#e5ebf7] p-2 rounded-md">
+      <div className={cn(
+        "relative grid grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-2 hover:bg-[#e5ebf7] data-[state=open]:bg-[#e5ebf7] p-2 rounded-md transition-opacity duration-200",
+        isDragging && "opacity-50",
+        isDropAbove && "before:absolute before:-top-[5px] before:left-0 before:right-0 before:h-0.5 before:bg-[#6366f1] before:rounded-full",
+        isDropBelow && "after:absolute after:-bottom-[5px] after:left-0 after:right-0 after:h-0.5 after:bg-[#6366f1] after:rounded-full",
+      )}>
         <Checkbox />
         <span
           className="size-3 rounded-full"
           style={{ backgroundColor: statusColor }}
         />
-        <Link
-          to="/projects/$projectId/tasks/$taskId"
-          params={{ projectId, taskId: task.ticket_id }}
-          className="truncate text-sm font-medium text-[#1b1b1b] hover:underline"
-        >
-          {task.title}
-        </Link>
-        <div className="flex items-center gap-2">
-          <TaskLabelDropdown
-            selectedLabels={merged.labels}
-            onLabelsChange={handleLabelsChange}
-            trigger={
-              merged.labels.length > 0 ? (
-                <StackedLabels labels={merged.labels} />
-              ) : undefined
-            }
-          />
-          <DueDateDropdown dueDate={merged.due_date} taskId={task.id} onDueDateChange={handleDueDateChange} />
-          <AvatarGroupCustom avatars={merged.assignees} />
+        <div ref={ref} className="flex items-center gap-2 justify-between">
+          <Link
+            to="/projects/$projectId/tasks/$taskId"
+            params={{ projectId, taskId: task.ticket_id }}
+            className="truncate text-sm font-medium text-[#1b1b1b] hover:underline"
+          >
+            {task.title}
+          </Link>
+          <div className="flex items-center gap-2">
+            <TaskLabelDropdown
+              selectedLabels={merged.labels}
+              onLabelsChange={handleLabelsChange}
+              trigger={
+                merged.labels.length > 0 ? (
+                  <StackedLabels labels={merged.labels} />
+                ) : undefined
+              }
+            />
+            <DueDateDropdown dueDate={merged.due_date} taskId={task.id} onDueDateChange={handleDueDateChange} />
+            <AvatarGroupCustom avatars={merged.assignees} />
+          </div>
         </div>
       </div>
     </TaskContextMenu>

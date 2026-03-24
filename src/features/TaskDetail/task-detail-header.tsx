@@ -1,24 +1,39 @@
-import { Badge } from "@/components/ui/badge";
 import type { ITask } from "@/types";
+import { Link } from "@tanstack/react-router";
 
-type TaskDetailHeaderProps = Pick<ITask, 'title' | 'ticket_id' | 'created_at' | 'creator'>;
+import { useStoreKanbanBoard } from "@/stores/use-store-kanban-board";
 
-export default function TaskDetailHeader({ title, ticket_id, created_at, creator }: Readonly<TaskDetailHeaderProps>) {
+type TaskDetailHeaderProps = Pick<ITask, 'parent' | 'title'> & {
+  projectId: string;
+};
+
+export default function TaskDetailHeader({ parent, title, projectId }: Readonly<TaskDetailHeaderProps>) {
+  const column_id = parent?.column_id;
+  const statusColor = useStoreKanbanBoard(
+    (state) => state.kanbanBoard?.columns.find((col) => col.id === column_id)?.color,
+  );
+
   return (
     <div>
       <h1 className="text-3xl font-bold text-primary">
         {title}
       </h1>
-      <div className="flex items-center gap-2 mt-2">
-        <Badge variant="outline" className="p-1.5 px-2">
-          {ticket_id}
-        </Badge>
-        {creator && (
-          <p className="text-sm text-muted-foreground">
-            Created by <span className="text-[#5a5cf2]">{creator.full_name}</span> on {created_at}
-          </p>
-        )}
-      </div>
+      {parent && (
+        <div className="flex items-center gap-2 mt-2">
+          Sub issue of
+          <Link
+            to="/projects/$projectId/tasks/$taskId"
+            params={{ projectId, taskId: parent.ticket_id }}
+            className="text-sm text-muted-foreground flex items-center gap-2"
+          >
+            <span
+              className="size-3 shrink-0 rounded-full"
+              style={{ backgroundColor: statusColor }}
+            />
+            {parent.title}
+          </Link>
+        </div>
+      )}
     </div>
   );
 }
