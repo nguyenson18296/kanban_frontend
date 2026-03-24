@@ -74,8 +74,8 @@ export default function SubtaskItem({ task, order }: Readonly<SubtaskItemProps>)
       task={merged}
       onTaskUpdate={handleTaskUpdate}
     >
-      <div className={cn(
-        "relative grid grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-2 hover:bg-[#e5ebf7] data-[state=open]:bg-[#e5ebf7] p-2 rounded-md transition-opacity duration-200",
+      <div ref={ref} className={cn(
+        "relative grid grid-cols-[auto_auto_minmax(0,1fr)] items-center gap-2 hover:bg-[#e5ebf7] data-[state=open]:bg-[#e5ebf7] p-2 rounded-md transition-opacity duration-200",
         isDragging && "opacity-50",
         isDropAbove && "before:absolute before:-top-[5px] before:left-0 before:right-0 before:h-0.5 before:bg-[#6366f1] before:rounded-full",
         isDropBelow && "after:absolute after:-bottom-[5px] after:left-0 after:right-0 after:h-0.5 after:bg-[#6366f1] after:rounded-full",
@@ -85,7 +85,7 @@ export default function SubtaskItem({ task, order }: Readonly<SubtaskItemProps>)
           className="size-3 rounded-full"
           style={{ backgroundColor: statusColor }}
         />
-        <div ref={ref} className="flex items-center gap-2 justify-between">
+        <div className="flex items-center gap-2 justify-between">
           <Link
             to="/projects/$projectId/tasks/$taskId"
             params={{ projectId, taskId: task.ticket_id }}
