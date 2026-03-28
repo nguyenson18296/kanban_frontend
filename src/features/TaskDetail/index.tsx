@@ -10,6 +10,7 @@ import TaskDetailHeader from "./task-detail-header";
 import TaskDetailDescription from "./task-detail-description";
 import TaskDetailSidebar from "./task-detail-sidebar";
 import Subtask from "./subtask";
+import Activity from "./activity";
 
 import type { ILabel, Priority, TAssignee } from "@/types";
 
@@ -80,6 +81,7 @@ export default function TaskDetail() {
         />
         <TaskDetailDescription key={task.id} id={task.id} description={task.description} />
         <Subtask taskId={task.id} teamId={task.creator?.team_id ?? 0} />
+        <Activity taskId={task.id} />
       </div>
       <div className="w-1/4">
         <TaskDetailSidebar
