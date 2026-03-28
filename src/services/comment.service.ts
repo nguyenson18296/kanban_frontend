@@ -9,6 +9,10 @@ export const createComment = (taskId: string, comment: ICommentDto) => {
   return httpClient.post<IComment>(`/tasks/${taskId}/comments`, comment);
 }
 
-export const updateComment = (taskId: string, commentId: string, comment: ICommentDto) => {
-  return httpClient.put<IComment>(`/tasks/${taskId}/comments/${commentId}`, comment);
+export const updateComment = (commentId: string, body: { content: string }) => {
+  return httpClient.patch<IComment>(`/comments/${commentId}`, body);
+}
+
+export const deleteComment = (commentId: string) => {
+  return httpClient.delete<void>(`/comments/${commentId}`);
 }
