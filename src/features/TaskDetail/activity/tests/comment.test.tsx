@@ -1,5 +1,6 @@
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { toast } from "sonner";
 
 import CommentsSection from "../comments";
 import type { IComment } from "@/types";
@@ -38,10 +39,24 @@ vi.mock("../hooks/use-get-task-comments", () => ({
   }),
 }));
 
-// Mock TaskCommentItem — render content so we can verify order
+const mockDeleteComment = vi.fn();
+vi.mock("../hooks/use-delete-comment", () => ({
+  useDeleteComment: () => ({ mutateAsync: mockDeleteComment }),
+}));
+
+vi.mock("sonner", () => ({
+  toast: { error: vi.fn() },
+}));
+
+// Mock TaskCommentItem — render content and expose onDelete
 vi.mock("@/components/TaskComment/item", () => ({
-  default: ({ comment }: { comment: IComment }) => (
-    <div data-testid="comment-item">{comment.content}</div>
+  default: ({ comment, onDelete }: { comment: IComment; onDelete: (id: string) => void }) => (
+    <div data-testid="comment-item">
+      {comment.content}
+      <button data-testid={`delete-${comment.id}`} onClick={() => onDelete(comment.id)}>
+        Delete
+      </button>
+    </div>
   ),
 }));
 
@@ -154,6 +169,42 @@ describe("CommentsSection", () => {
       expect(items).toHaveLength(5);
       expect(items[3]).toHaveTextContent("Fourth");
       expect(items[4]).toHaveTextContent("Fifth");
+    });
+  });
+
+  describe("comment deletion", () => {
+    it("removes the comment from the list on successful deletion", async () => {
+      mockDeleteComment.mockResolvedValueOnce(undefined);
+
+      render(<CommentsSection taskId="task-1" />);
+      expect(screen.getAllByTestId("comment-item")).toHaveLength(3);
+
+      await act(async () => {
+        screen.getByTestId("delete-c-1").click();
+      });
+
+      const items = screen.getAllByTestId("comment-item");
+      expect(items).toHaveLength(2);
+      // c-3 (09:00) → c-2 (11:00), c-1 removed
+      expect(items[0]).toHaveTextContent("Third comment");
+      expect(items[1]).toHaveTextContent("Second comment");
+    });
+
+    it("shows error toast and keeps comment when deletion fails", async () => {
+      mockDeleteComment.mockRejectedValueOnce(new Error("Network error"));
+
+      render(<CommentsSection taskId="task-1" />);
+
+      await act(async () => {
+        screen.getByTestId("delete-c-1").click();
+      });
+
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalledWith("Failed to delete comment, please try again.");
+      });
+
+      // All comments remain
+      expect(screen.getAllByTestId("comment-item")).toHaveLength(3);
     });
   });
 });
