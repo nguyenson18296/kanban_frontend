@@ -238,3 +238,14 @@
 .editor-content .tiptap s {
   text-decoration: line-through;
 }
+
+/* Mentions — scoped to editor and read-only comment content */
+.editor-content [data-mention],
+.prose [data-mention] {
+  color: #6366f1;
+  font-weight: 500;
+  border-radius: 0.25rem;
+  padding: 0.125rem 0.25rem;
+  background: rgb(99 102 241 / 0.1);
+}
+

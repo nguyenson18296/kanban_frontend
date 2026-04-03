@@ -1,8 +1,11 @@
+import { useState } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 
 import { BubbleToolbar } from "./bubble-toolbar";
+import CustomMention from "./mention";
+import { createMentionSuggestion } from "./mention-suggestion";
 import { cn } from "@/lib/utils";
 
 interface EditorProps {
@@ -22,6 +25,7 @@ export default function Editor({
   editorClassName,
   onChange,
 }: Readonly<EditorProps>) {
+  const [mentionSuggestion] = useState(createMentionSuggestion);
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -31,6 +35,9 @@ export default function Editor({
       }),
       Placeholder.configure({
         placeholder,
+      }),
+      CustomMention.configure({
+        suggestion: mentionSuggestion,
       }),
     ],
     // Note: class is captured at initialization time and won't react to dynamic changes.

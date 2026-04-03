@@ -112,7 +112,7 @@ export default function TaskCommentItem({ comment, taskId, onDelete }: Readonly<
       ) : (
         <div
           className="prose prose-sm max-w-none text-[#0f172a] mt-2"
-          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(comment.content) }}
+          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(comment.content, { ADD_ATTR: ["data-mention-id", "data-mention"] }) }}
         />
       )}
     </div>
