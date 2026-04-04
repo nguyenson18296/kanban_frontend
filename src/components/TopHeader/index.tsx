@@ -1,7 +1,9 @@
-import { Bell, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import UserSettingsDropdown from '../UserSettingsDropdown';
 import { useStoreUser } from '../../stores/use-store-user';
+
+import Notifications from './Notifications';
 
 export default function TopHeader() {
   const { user } = useStoreUser();
@@ -19,10 +21,7 @@ export default function TopHeader() {
 
       <div className="flex items-center gap-4">
         {/* Notification bell */}
-        <Button variant="ghost" size="icon-lg" className="relative rounded-full">
-          <Bell className="h-5 w-4" />
-          <span className="absolute right-2.5 top-2 h-2 w-2 rounded-full border-2 border-white bg-[#e74008]" />
-        </Button>
+        <Notifications />
 
         {/* Create Task button */}
         <Button
