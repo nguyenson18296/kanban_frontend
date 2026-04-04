@@ -10,4 +10,9 @@ interface IResponse<T> {
   meta: IResponseMeta;
 }
 
-export type { IResponseMeta, IResponse };
+interface IQueryParams {
+  page?: number;
+  limit?: number;
+}
+
+export type { IResponseMeta, IResponse, IQueryParams };
