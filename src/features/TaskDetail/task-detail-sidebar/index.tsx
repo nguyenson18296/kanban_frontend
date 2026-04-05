@@ -14,10 +14,12 @@ import TaskLabel from "@/components/TaskLabel";
 import TaskLabelDropdown from "@/components/TaskLabelDropdown";
 import DueDateDropdown from "@/components/DueDateDropdown";
 
+import { TaskActivityAction } from "@/types";
 import type { ILabel, ITask, Priority, TAssignee } from "@/types";
 import { PRIORITY_OPTIONS } from "@/constants/priority";
 import { cn } from "@/lib/utils";
 import { useStoreKanbanBoard } from "@/stores/use-store-kanban-board";
+import { useStoreOptimisticActivities, createOptimisticActivity } from "@/stores/use-store-optimistic-activities";
 import { useMoveTaskToColumn } from "@/features/KanbanBoard/hooks/use-move-task-to-column";
 
 function getInitials(name: string): string {
@@ -61,6 +63,7 @@ export default function TaskDetailSidebar({
   const [localDueDate, setLocalDueDate] = useState<ITask['due_date']>(due_date);
   const moveTaskInStore = useStoreKanbanBoard((state) => state.moveTask);
   const { mutate: moveTaskToColumnMutation } = useMoveTaskToColumn();
+  const addOptimisticActivity = useStoreOptimisticActivities((s) => s.addActivity);
 
   const handleAssigneeChange = (assignees: TAssignee[]) => {
     setLocalAssignees(assignees);
@@ -83,6 +86,13 @@ export default function TaskDetailSidebar({
   };
 
   const handleStatusChange = (columnId: number) => {
+    addOptimisticActivity(
+      id,
+      createOptimisticActivity(
+        TaskActivityAction.TASK_MOVED,
+        { from_column_id: localColumnId, to_column_id: columnId, position: 0 },
+      ),
+    );
     moveTaskInStore(id, localColumnId, columnId, 0);
     moveTaskToColumnMutation({ id, columnId, position: 0 });
     setLocalColumnId(columnId);

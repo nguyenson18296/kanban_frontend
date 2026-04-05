@@ -7,8 +7,9 @@ export const useUpdateTask = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, task }: { id: string; task: Partial<ITask> }) => updateTask(id, task),
-    onSettled: () => {
+    onSettled: (_data, _error, variables) => {
       queryClient.invalidateQueries({ queryKey: ['board'] });
+      queryClient.invalidateQueries({ queryKey: ['activities', variables.id] });
     },
   });
 }

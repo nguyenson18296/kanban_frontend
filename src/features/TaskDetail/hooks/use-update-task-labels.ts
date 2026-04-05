@@ -7,8 +7,9 @@ export const useUpdateTaskLabels = () => {
 
   return useMutation({
     mutationFn: ({ id, label_ids }: { id: string; label_ids: string[] }) => updateTaskLabels(id, label_ids),
-    onSettled: () => {
+    onSettled: (_data, _error, variables) => {
       queryClient.invalidateQueries({ queryKey: ['board'] });
+      queryClient.invalidateQueries({ queryKey: ['activities', variables.id] });
     },
   });
 }

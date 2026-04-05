@@ -17,8 +17,9 @@ export const useUpdateAssignees = () => {
   return useMutation({
     mutationFn: ({ id, assignee_ids }: UpdateAssigneesVariables) =>
       updateTaskAssignees(id, assignee_ids),
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['board'] });
+      queryClient.invalidateQueries({ queryKey: ['activities', variables.id] });
     },
     onError: (_error, variables) => {
       // Revert optimistic update on failure
