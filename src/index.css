@@ -310,3 +310,8 @@
   }
 }
 
+/* Activity timeline */
+.activity-group > div:last-child .activity-timeline-line {
+  display: none;
+}
+

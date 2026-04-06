@@ -12,7 +12,12 @@ import TaskDetailSidebar from "./task-detail-sidebar";
 import Subtask from "./subtask";
 import Activity from "./activity";
 
+import { TaskActivityAction } from "@/types";
 import type { ILabel, Priority, TAssignee } from "@/types";
+import {
+  useStoreOptimisticActivities,
+  createOptimisticActivity,
+} from "@/stores/use-store-optimistic-activities";
 
 export default function TaskDetail() {
   const { taskId: ticketId, projectId } = useParams({
@@ -21,6 +26,7 @@ export default function TaskDetail() {
 
   useGetBoard(projectId);
   const { data: task, isLoading, isError } = useGetTaskByTicketId(ticketId);
+  const addOptimisticActivity = useStoreOptimisticActivities((s) => s.addActivity);
 
   const { mutate: updateTaskMutation } = useUpdateTask();
   const { mutate: updateAssigneesMutation } = useUpdateAssignees();
@@ -29,6 +35,10 @@ export default function TaskDetail() {
   const handlePriorityChange = (priority: Priority) => {
     if (!task) return;
     if (task.priority === priority) return;
+    addOptimisticActivity(
+      task.id,
+      createOptimisticActivity(TaskActivityAction.TASK_PRIORITY_CHANGED, { from: task.priority, to: priority }),
+    );
     updateTaskMutation({
       id: task.id,
       task: { priority },
@@ -40,6 +50,23 @@ export default function TaskDetail() {
     const prevIds = new Set(task.assignees.map((a) => a.id));
     const nextIds = new Set(assignees.map((a) => a.id));
     if (prevIds.size === nextIds.size && [...prevIds].every((id) => nextIds.has(id))) return;
+
+    const added = assignees.filter((a) => !prevIds.has(a.id));
+    const removed = task.assignees.filter((a) => !nextIds.has(a.id));
+
+    if (added.length > 0) {
+      addOptimisticActivity(
+        task.id,
+        createOptimisticActivity(TaskActivityAction.TASK_ASSIGNEE_ADDED, { users: added.map((a) => ({ user_id: a.id, full_name: a.full_name })) }),
+      );
+    }
+    if (removed.length > 0) {
+      addOptimisticActivity(
+        task.id,
+        createOptimisticActivity(TaskActivityAction.TASK_ASSIGNEE_REMOVED, { users: removed.map((a) => ({ user_id: a.id, full_name: a.full_name })) }),
+      );
+    }
+
     updateAssigneesMutation({
       id: task.id,
       assignee_ids: assignees.map((a) => a.id),
@@ -49,6 +76,25 @@ export default function TaskDetail() {
 
   const handleLabelsChange = (labels: ILabel[]) => {
     if (!task) return;
+    const prevIds = new Set(task.labels.map((l) => l.id));
+    const nextIds = new Set(labels.map((l) => l.id));
+
+    const added = labels.filter((l) => !prevIds.has(l.id));
+    const removed = task.labels.filter((l) => !nextIds.has(l.id));
+
+    if (added.length > 0) {
+      addOptimisticActivity(
+        task.id,
+        createOptimisticActivity(TaskActivityAction.TASK_LABEL_ADDED, { labels: added.map((l) => ({ label_id: Number(l.id), label_name: l.name, color: l.color })) }),
+      );
+    }
+    if (removed.length > 0) {
+      addOptimisticActivity(
+        task.id,
+        createOptimisticActivity(TaskActivityAction.TASK_LABEL_REMOVED, { labels: removed.map((l) => ({ label_id: Number(l.id), label_name: l.name, color: l.color })) }),
+      );
+    }
+
     updateTaskLabelsMutation({
       id: task.id,
       label_ids: labels.map((l) => l.id),
@@ -57,6 +103,10 @@ export default function TaskDetail() {
 
   const handleDueDateChange = (date: string | null) => {
     if (!task) return;
+    addOptimisticActivity(
+      task.id,
+      createOptimisticActivity(TaskActivityAction.TASK_DUE_DATE_CHANGED, { from: task.due_date ?? null, to: date }),
+    );
     updateTaskMutation({
       id: task.id,
       task: { due_date: date },
