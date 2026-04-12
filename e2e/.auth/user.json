@@ -1,0 +1,35 @@
+{
+  "cookies": [
+    {
+      "name": "access_token",
+      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0OTU2NmIwYy0xMTA3LTQyYWUtOTM1ZS1jNWFmMDRmNmM0NTAiLCJlbWFpbCI6ImdyYWNlQGthbmJhbi5kZXYiLCJyb2xlIjoiYmFja2VuZF9kZXZlbG9wZXIiLCJpYXQiOjE3NzYwMTAyMDksImV4cCI6MTc3NjAxMzgwOX0.wLRXnD1MYUgyZjiXB93-5mB-qE4qY3fBw5frTBxG22Y",
+      "domain": "localhost",
+      "path": "/",
+      "expires": 1776013809.886662,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Strict"
+    },
+    {
+      "name": "refresh_token",
+      "value": "xJAZb5ML8WYys05aIpH_VgCmlZ75-U-3JMaXJDfeiWs",
+      "domain": "localhost",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Strict"
+    }
+  ],
+  "origins": [
+    {
+      "origin": "http://localhost:5173",
+      "localStorage": [
+        {
+          "name": "user-store",
+          "value": "{\"state\":{\"user\":{\"id\":\"49566b0c-1107-42ae-935e-c5af04f6c450\",\"email\":\"grace@kanban.dev\",\"full_name\":\"Grace Bui\",\"role\":\"backend_developer\",\"avatar_url\":\"https://api.dicebear.com/9.x/initials/svg?seed=Grace%20Bui\"}},\"version\":0}"
+        }
+      ]
+    }
+  ]
+}
