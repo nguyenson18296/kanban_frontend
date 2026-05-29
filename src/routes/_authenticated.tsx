@@ -3,6 +3,7 @@ import { getCookie } from '@/lib/cookie'
 import { tryRefreshTokens } from '@/lib/http-client'
 import Sidebar from '@/components/Sidebar'
 import TopHeader from '@/components/TopHeader'
+import { WebSocketProvider } from '@/providers/websocket-provider'
 
 export const Route = createFileRoute('/_authenticated')({
   beforeLoad: async () => {
@@ -19,14 +20,16 @@ export const Route = createFileRoute('/_authenticated')({
 
 function AuthenticatedLayout() {
   return (
-    <div className="flex h-screen bg-[#fafbfc] font-['Inter',sans-serif]">
-      <Sidebar />
-      <main className="flex flex-1 flex-col overflow-hidden">
-        <TopHeader />
-        <div className="flex-1 overflow-y-auto p-8">
-          <Outlet />
-        </div>
-      </main>
-    </div>
+    <WebSocketProvider>
+      <div className="flex h-screen bg-[#fafbfc] font-['Inter',sans-serif]">
+        <Sidebar />
+        <main className="flex flex-1 flex-col overflow-hidden">
+          <TopHeader />
+          <div className="flex-1 overflow-y-auto p-8">
+            <Outlet />
+          </div>
+        </main>
+      </div>
+    </WebSocketProvider>
   )
 }
