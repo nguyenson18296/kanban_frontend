@@ -23,17 +23,7 @@ import type {
   AssigneeChangePayload,
   LabelChangePayload,
 } from "@/types";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-
-function getInitials(name: string): string {
-  return name
-    .split(" ")
-    .filter(Boolean)
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
-}
+import { UserAvatar } from "@/components/UserAvatar";
 
 interface ActionStyle {
   icon: React.ReactNode;
@@ -253,12 +243,10 @@ export default function ActivityItem({ activity }: Readonly<{ activity: IActivit
       </div>
 
       {/* Actor avatar */}
-      <Avatar className="size-7 shrink-0 ring-2 ring-white">
-        <AvatarImage src={actor.avatar_url ?? undefined} alt={actor.full_name} />
-        <AvatarFallback className="text-[10px] bg-[#1e293b] text-white font-medium">
-          {getInitials(actor.full_name)}
-        </AvatarFallback>
-      </Avatar>
+      <UserAvatar
+        user={actor}
+        className="size-7 shrink-0 ring-2 ring-white"
+      />
 
       {/* Content */}
       <div className="min-w-0 flex-1 pt-0.5">
