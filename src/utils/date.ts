@@ -39,3 +39,24 @@ export function formatDate(
 ): string {
   return date.toLocaleDateString("en-US", options);
 }
+
+/**
+ * Format an ISO date string as "MMM yyyy" (e.g. "Mar 2024"), suitable
+ * for "Joined ..." / "Created ..." labels. Returns null when the input
+ * is empty, missing, or unparseable so callers can skip rendering.
+ *
+ * Forces UTC so backend-canonical timestamps render the same month/year
+ * for every viewer. Without this, a UTC-midnight `created_at` on the
+ * 1st of a month (e.g. `2024-03-01T00:00:00.000Z`) would shift to the
+ * previous month in negative-offset timezones (e.g. "Feb 2024" in UTC-5).
+ */
+export function formatJoinedDate(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  return formatDate(date, {
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}

@@ -2,6 +2,7 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { UserAvatar } from "../index";
+import { useStorePresence } from "@/stores/use-store-presence";
 import { createUser } from "@/test-factories";
 
 // Mock the Radix HoverCard so content is always rendered (no portal, no
@@ -27,7 +28,19 @@ vi.mock("@/components/ui/hover-card", () => ({
   ),
 }));
 
-afterEach(cleanup);
+// Stub the bootstrap module so useUserPresence doesn't fire real REST
+// requests through a 250ms timer that may outlive the test.
+vi.mock("@/lib/presence/bootstrap", () => ({
+  scheduleRefetchVisiblePresence: vi.fn(),
+  refetchVisiblePresence: vi.fn(),
+  applyPresenceUpdate: vi.fn(),
+  resetPresence: vi.fn(),
+}));
+
+afterEach(() => {
+  cleanup();
+  useStorePresence.getState().reset();
+});
 
 const baseUser = createUser({
   id: "u-1",
@@ -49,6 +62,24 @@ describe("UserAvatar", () => {
       });
       expect(trigger).toBeInTheDocument();
       expect(trigger).toHaveAttribute("type", "button");
+    });
+
+    it("trims and collapses whitespace in the accessible label", () => {
+      render(
+        <UserAvatar user={{ ...baseUser, full_name: "  Ada    Lovelace  " }} />,
+      );
+
+      expect(
+        screen.getByRole("button", { name: "View profile for Ada Lovelace" }),
+      ).toBeInTheDocument();
+    });
+
+    it("uses an 'Unknown user' label when full_name is blank", () => {
+      render(<UserAvatar user={{ ...baseUser, full_name: "   " }} />);
+
+      expect(
+        screen.getByRole("button", { name: "View profile for Unknown user" }),
+      ).toBeInTheDocument();
     });
 
     it("renders both the trigger and hover-content avatars", () => {
@@ -107,6 +138,40 @@ describe("UserAvatar", () => {
 
     it("does not render an online indicator when isOnline is false", () => {
       render(<UserAvatar user={baseUser} isOnline={false} />);
+      expect(
+        screen.queryByRole("status", { name: "Online" }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("derives online state from the presence store when isOnline is not passed", () => {
+      useStorePresence.getState().setSnapshot([
+        {
+          userId: baseUser.id,
+          isOnline: true,
+          connectionCount: 1,
+          lastChangedAt: "2026-06-24T09:00:00.000Z",
+        },
+      ]);
+
+      render(<UserAvatar user={baseUser} />);
+
+      expect(
+        screen.getByRole("status", { name: "Online" }),
+      ).toBeInTheDocument();
+    });
+
+    it("explicit isOnline=false overrides a store entry that says online", () => {
+      useStorePresence.getState().setSnapshot([
+        {
+          userId: baseUser.id,
+          isOnline: true,
+          connectionCount: 1,
+          lastChangedAt: null,
+        },
+      ]);
+
+      render(<UserAvatar user={baseUser} isOnline={false} />);
+
       expect(
         screen.queryByRole("status", { name: "Online" }),
       ).not.toBeInTheDocument();
@@ -184,17 +249,27 @@ describe("UserAvatar", () => {
 
       const content = screen.getByTestId("hover-card-content");
       expect(within(content).getByText("Online")).toBeInTheDocument();
-      expect(within(content).queryByText("Active")).not.toBeInTheDocument();
     });
 
-    it("shows 'Active' when is_active is true and not online", () => {
+    it("shows 'Offline' status when isOnline is explicitly false", () => {
+      render(<UserAvatar user={baseUser} isOnline={false} />);
+
+      const content = screen.getByTestId("hover-card-content");
+      expect(within(content).getByText("Offline")).toBeInTheDocument();
+    });
+
+    it("does NOT show 'Active' just because is_active is true (presence unknown)", () => {
+      // Regression: is_active is the account-enabled flag, not online presence.
+      // It must not fabricate a misleading "Active" label.
       render(<UserAvatar user={baseUser} />);
 
       const content = screen.getByTestId("hover-card-content");
-      expect(within(content).getByText("Active")).toBeInTheDocument();
+      expect(within(content).queryByText("Active")).not.toBeInTheDocument();
+      expect(within(content).queryByText("Online")).not.toBeInTheDocument();
+      expect(within(content).queryByText("Offline")).not.toBeInTheDocument();
     });
 
-    it("shows 'Inactive' when is_active is false", () => {
+    it("shows 'Inactive' when the account is deactivated", () => {
       const user = { ...baseUser, is_active: false };
       render(<UserAvatar user={user} />);
 
@@ -202,8 +277,24 @@ describe("UserAvatar", () => {
       expect(within(content).getByText("Inactive")).toBeInTheDocument();
     });
 
-    it("hides the footer when there is no status info and no created_at", () => {
-      // Narrow shape: just id + name + avatar — what IActivity.actor passes.
+    it("'Inactive' takes precedence over a store entry that says online", () => {
+      useStorePresence.getState().setSnapshot([
+        {
+          userId: baseUser.id,
+          isOnline: true,
+          connectionCount: 1,
+          lastChangedAt: null,
+        },
+      ]);
+
+      render(<UserAvatar user={{ ...baseUser, is_active: false }} />);
+
+      const content = screen.getByTestId("hover-card-content");
+      expect(within(content).getByText("Inactive")).toBeInTheDocument();
+      expect(within(content).queryByText("Online")).not.toBeInTheDocument();
+    });
+
+    it("hides the status row when presence is unknown and account is active", () => {
       render(
         <UserAvatar
           user={{
@@ -215,6 +306,8 @@ describe("UserAvatar", () => {
       );
 
       const content = screen.getByTestId("hover-card-content");
+      expect(within(content).queryByText("Online")).not.toBeInTheDocument();
+      expect(within(content).queryByText("Offline")).not.toBeInTheDocument();
       expect(within(content).queryByText("Active")).not.toBeInTheDocument();
       expect(within(content).queryByText("Inactive")).not.toBeInTheDocument();
       expect(within(content).queryByText(/^Joined /)).not.toBeInTheDocument();
