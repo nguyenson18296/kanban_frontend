@@ -8,6 +8,7 @@ import {
 
 import CommentsSection from "./comments";
 import ActivityList from "./activity-list";
+import Subscribers from "./subscribers";
 import { useGetActivities } from "./hooks/use-get-activities";
 import type { IActivity } from "@/types";
 import { useStoreOptimisticActivities } from "@/stores/use-store-optimistic-activities";
@@ -99,10 +100,13 @@ export default function Activity({ taskId }: Readonly<{ taskId: string }>) {
 
   return (
     <Tabs className="w-full mt-12" value={activeTab} onValueChange={setActiveTab}>
-      <TabsList>
-        <TabsTrigger value="activity">Activity</TabsTrigger>
-        <TabsTrigger value="comments">Comments</TabsTrigger>
-      </TabsList>
+      <div className="flex items-center justify-between">
+        <TabsList>
+          <TabsTrigger value="activity">Activity</TabsTrigger>
+          <TabsTrigger value="comments">Comments</TabsTrigger>
+        </TabsList>
+        <Subscribers taskId={taskId} />
+      </div>
       <TabsContent value="activity">
         <ActivityLog taskId={taskId} />
       </TabsContent>
