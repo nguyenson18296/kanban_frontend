@@ -55,6 +55,7 @@ export default function RenameTaskModal({
         </VisuallyHidden.Root>
         <div className="p-2">
           <Input
+            aria-label="Rename task"
             value={value}
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={handleKeyDown}

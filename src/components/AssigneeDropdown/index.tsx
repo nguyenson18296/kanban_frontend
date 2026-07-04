@@ -87,12 +87,13 @@ export default function AssigneeDropdown({
 
   const defaultTrigger =
     assignees.length > 0 ? (
-      <button type="button" className="cursor-pointer py-2">
+      <button type="button" aria-label="Change assignees" className="cursor-pointer py-2">
         <AvatarGroupCustom visibleCount={3} avatars={assignees} />
       </button>
     ) : (
       <button
         type="button"
+        aria-label="Add assignee"
         className="flex size-6 items-center justify-center rounded-full border border-dashed border-[#cbd5e1] text-[#94a3b8] transition-colors hover:border-[#94a3b8] hover:text-[#64748b]"
       >
         <UserRound className="size-3.5" />

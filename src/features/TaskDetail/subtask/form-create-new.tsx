@@ -91,7 +91,7 @@ export default function FormCreateNew({ isLoading, subtaskCount, teamId, onSubmi
   const PriorityIcon = currentPriority.icon;
 
   const priorityTrigger = (
-    <Button variant="outline" size="icon" className="text-xs size-[30px]">
+    <Button variant="outline" size="icon" aria-label={`Priority: ${currentPriority.label}`} className="text-xs size-[30px]">
       <PriorityIcon className={cn("size-4", currentPriority.color)} />
     </Button>
   );

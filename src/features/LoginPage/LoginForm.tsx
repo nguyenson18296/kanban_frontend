@@ -115,10 +115,12 @@ export default function LoginForm() {
             id="email"
             type="email"
             placeholder="name@company.com"
+            aria-invalid={!!errors.email}
+            aria-describedby={errors.email ? "email-error" : undefined}
             {...register('email', { onChange: () => isError && resetLogin() })}
           />
           {errors.email && (
-            <p className="text-sm text-destructive">{errors.email.message}</p>
+            <p id="email-error" role="alert" className="text-sm text-destructive">{errors.email.message}</p>
           )}
         </div>
 
@@ -128,10 +130,12 @@ export default function LoginForm() {
             id="password"
             type="password"
             placeholder="••••••••"
+            aria-invalid={!!errors.password}
+            aria-describedby={errors.password ? "password-error" : undefined}
             {...register('password', { onChange: () => isError && resetLogin() })}
           />
           {errors.password && (
-            <p className="text-sm text-destructive">
+            <p id="password-error" role="alert" className="text-sm text-destructive">
               {errors.password.message}
             </p>
           )}

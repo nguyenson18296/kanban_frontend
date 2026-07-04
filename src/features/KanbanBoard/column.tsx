@@ -43,7 +43,7 @@ export default function Column({ id, title, color, tasks, index, isDropTarget }:
             {tasks.length}
           </span>
         </div>
-        <Button variant="ghost" size="icon-xs" className="text-[#94a3b8] hover:text-[#64748b]">
+        <Button variant="ghost" size="icon-xs" aria-label="Add task" className="text-[#94a3b8] hover:text-[#64748b]">
           <Plus className="h-4 w-4" />
         </Button>
       </div>

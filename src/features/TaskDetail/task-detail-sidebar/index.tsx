@@ -178,6 +178,7 @@ export default function TaskDetailSidebar({
                 <Button
                   variant="outline"
                   size="icon"
+                  aria-label="Add label"
                   className="size-6 border-none"
                 >
                   <Plus />

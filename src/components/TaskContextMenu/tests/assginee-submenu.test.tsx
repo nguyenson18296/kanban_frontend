@@ -219,6 +219,10 @@ describe("AssigneeSubmenu", () => {
       id: "task-42",
       assignee_ids: expect.arrayContaining(["u-1", "u-2"]),
       previousAssignees: [createAssignee("u-1", "Alice Smith")],
+      assignees: expect.arrayContaining([
+        { id: "u-1", full_name: "Alice Smith", avatar_url: "https://example.com/alice.png" },
+        { id: "u-2", full_name: "Bob Jones", avatar_url: "https://example.com/bob.png" },
+      ]),
     });
   });
 
@@ -246,6 +250,9 @@ describe("AssigneeSubmenu", () => {
       previousAssignees: [
         createAssignee("u-1", "Alice Smith"),
         createAssignee("u-2", "Bob Jones"),
+      ],
+      assignees: [
+        { id: "u-2", full_name: "Bob Jones", avatar_url: "https://example.com/bob.png" },
       ],
     });
   });

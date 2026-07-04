@@ -70,6 +70,7 @@ export default function Task({
       id,
       assignee_ids: newAssignees.map((a) => a.id),
       previousAssignees: assignees,
+      assignees: newAssignees,
     });
     updateTaskAssignees(id, newAssignees);
   };
@@ -94,7 +95,7 @@ export default function Task({
         role="button"
         tabIndex={0}
         className={cn(
-          "mb-3 cursor-grab rounded-xl border bg-white p-4 shadow-sm transition-all hover:shadow-md",
+          "mb-3 cursor-grab rounded-xl border bg-white p-4 shadow-sm transition-all hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6366f1]",
           isDragging
             ? "rotate-3 scale-105 border-[#6366f1] shadow-lg ring-2 ring-[#6366f1]/20"
             : "border-[#e8ecf1]",
