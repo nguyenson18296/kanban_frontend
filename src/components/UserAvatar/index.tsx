@@ -1,5 +1,3 @@
-import { format } from "date-fns";
-
 import {
   HoverCard,
   HoverCardContent,
@@ -12,7 +10,9 @@ import {
   AvatarImage,
 } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { useUserPresence } from "@/hooks/use-presence";
 import { cn } from "@/lib/utils";
+import { formatJoinedDate } from "@/utils/date";
 
 interface UserAvatarUser {
   id: string;
@@ -33,8 +33,6 @@ interface UserAvatarProps {
   closeDelay?: number;
 }
 
-const JOINED_FORMAT = "MMM yyyy";
-
 function getInitials(name: string): string {
   const initials = name
     .split(" ")
@@ -45,11 +43,8 @@ function getInitials(name: string): string {
   return initials || "?";
 }
 
-function formatJoined(iso: string): string | null {
-  if (!iso) return null;
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return null;
-  return format(date, JOINED_FORMAT);
+function getDisplayName(name: string): string {
+  return name.trim().replace(/\s+/g, " ") || "Unknown user";
 }
 
 export function UserAvatar({
@@ -61,13 +56,21 @@ export function UserAvatar({
   closeDelay = 100,
 }: Readonly<UserAvatarProps>) {
   const initials = getInitials(user.full_name);
+  const displayName = getDisplayName(user.full_name);
+
+  // Auto-derive presence from the global store unless the caller passes an
+  // explicit override (e.g. the current user's own avatar, where the answer
+  // is known without a store subscription). `undefined` flows through as
+  // "unknown" so the hover card doesn't fabricate a status (contract §9).
+  const presence = useUserPresence(user.id, isOnline === undefined);
+  const effectiveIsOnline = isOnline ?? presence?.isOnline;
 
   return (
     <HoverCard openDelay={openDelay} closeDelay={closeDelay}>
       <HoverCardTrigger asChild>
         <button
           type="button"
-          aria-label={`View profile for ${user.full_name}`}
+          aria-label={`View profile for ${displayName}`}
           className={cn(
             "relative inline-flex rounded-full outline-hidden",
             "transition-[transform,box-shadow] duration-150 ease-out",
@@ -78,10 +81,10 @@ export function UserAvatar({
           <Avatar size={size} className={className}>
             <AvatarImage
               src={user.avatar_url ?? undefined}
-              alt={user.full_name}
+              alt={displayName}
             />
             <AvatarFallback aria-hidden="true">{initials}</AvatarFallback>
-            {isOnline ? (
+            {effectiveIsOnline ? (
               <AvatarBadge
                 role="status"
                 aria-label="Online"
@@ -93,7 +96,8 @@ export function UserAvatar({
       </HoverCardTrigger>
       <UserHoverCardContent
         user={user}
-        isOnline={isOnline}
+        displayName={displayName}
+        isOnline={effectiveIsOnline}
         initials={initials}
       />
     </HoverCard>
@@ -102,28 +106,33 @@ export function UserAvatar({
 
 interface UserHoverCardContentProps {
   user: UserAvatarUser;
+  displayName: string;
   isOnline?: boolean;
   initials: string;
 }
 
 function UserHoverCardContent({
   user,
+  displayName,
   isOnline,
   initials,
 }: Readonly<UserHoverCardContentProps>) {
-  const joinedLabel = user.created_at ? formatJoined(user.created_at) : null;
-  const hasStatus = isOnline !== undefined || user.is_active !== undefined;
-  const showFooter = hasStatus || joinedLabel !== null;
-  const isInactive = user.is_active === false;
+  const joinedLabel = formatJoinedDate(user.created_at);
 
-  let statusLabel: string;
-  if (isOnline) {
-    statusLabel = "Online";
-  } else if (isInactive) {
+  // Status row is presence-driven, not is_active-driven. is_active is the
+  // account-enabled flag (almost always true) and conveys nothing useful
+  // here unless the account is deactivated.
+  let statusLabel: string | null;
+  if (user.is_active === false) {
     statusLabel = "Inactive";
+  } else if (isOnline === true) {
+    statusLabel = "Online";
+  } else if (isOnline === false) {
+    statusLabel = "Offline";
   } else {
-    statusLabel = "Active";
+    statusLabel = null;
   }
+  const showFooter = statusLabel !== null || joinedLabel !== null;
 
   return (
     <HoverCardContent align="start" sideOffset={8} className="w-72 p-4">
@@ -143,9 +152,9 @@ function UserHoverCardContent({
         <div className="min-w-0 flex-1">
           <p
             className="truncate text-sm font-semibold leading-tight text-foreground"
-            title={user.full_name}
+            title={displayName}
           >
-            {user.full_name}
+            {displayName}
           </p>
           {user.email ? (
             <p
@@ -164,21 +173,21 @@ function UserHoverCardContent({
       </div>
       {showFooter ? (
         <div className="mt-3 flex items-center justify-between border-t pt-3 text-xs text-muted-foreground">
-          {hasStatus ? (
+          {statusLabel === null ? (
+            <span />
+          ) : (
             <div className="flex items-center gap-1.5">
               <span
                 aria-hidden="true"
                 className={cn(
                   "size-1.5 rounded-full",
-                  isOnline || user.is_active !== false
+                  statusLabel === "Online"
                     ? "bg-emerald-500"
                     : "bg-muted-foreground/40",
                 )}
               />
               <span>{statusLabel}</span>
             </div>
-          ) : (
-            <span />
           )}
           {joinedLabel ? <span>Joined {joinedLabel}</span> : null}
         </div>

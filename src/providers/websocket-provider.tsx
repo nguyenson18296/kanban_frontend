@@ -19,6 +19,11 @@ import { getCookie } from '@/lib/cookie'
 import { tryRefreshTokens } from '@/lib/http-client'
 import { queryClient } from '@/lib/query-client'
 import { NotificationType } from '@/types/notification.type'
+import {
+  applyPresenceUpdate,
+  resetPresence,
+  scheduleRefetchVisiblePresence,
+} from '@/lib/presence/bootstrap'
 
 const NOTIFICATION_CONFIG: Record<
   WsNotification['type'],
@@ -213,6 +218,8 @@ export function WebSocketProvider({ children }: Readonly<{ children: ReactNode }
         })
       },
       onStatusChange: setStatus,
+      onConnect: scheduleRefetchVisiblePresence,
+      onPresenceUpdate: applyPresenceUpdate,
     })
 
     managerRef.current = manager
@@ -221,6 +228,7 @@ export function WebSocketProvider({ children }: Readonly<{ children: ReactNode }
     return () => {
       manager.disconnect()
       managerRef.current = null
+      resetPresence()
     }
   }, [])
 

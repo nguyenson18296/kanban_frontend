@@ -3,6 +3,7 @@ import type { Socket } from 'socket.io-client'
 import { z } from 'zod/v4'
 import { WS_URL } from '../config/env'
 import { NotificationType } from '@/types/notification.type'
+import type { IPresenceUpdate } from '@/types'
 
 // Incoming socket payloads cross an untrusted boundary — validate the envelope
 // (not the free-form `payload` contents) before handing it to the app.
@@ -28,6 +29,10 @@ interface SocketManagerOptions {
   refreshAccessToken: () => Promise<string | null>
   onNotification: (notification: WsNotification) => void
   onStatusChange: (status: ConnectionStatus) => void
+  // Fires on every server-authenticated connect AND every reconnect —
+  // use this to re-fetch the presence snapshot per contract §6.
+  onConnect?: () => void
+  onPresenceUpdate?: (update: IPresenceUpdate) => void
 }
 
 export class SocketManager {
@@ -76,6 +81,7 @@ export class SocketManager {
       this.options.onStatusChange('connected')
       this.scheduleTokenRefresh()
       console.debug(`[WS] Connected as user ${parsed.success ? parsed.data.userId : 'unknown'}`)
+      this.options.onConnect?.()
     })
 
     this.socket.on('connection:error', (raw: unknown) => {
@@ -91,6 +97,10 @@ export class SocketManager {
         return
       }
       this.options.onNotification(parsed.data)
+    })
+
+    this.socket.on('presence:update', (update: IPresenceUpdate) => {
+      this.options.onPresenceUpdate?.(update)
     })
 
     this.socket.on('token:refresh:success', () => {
@@ -117,6 +127,7 @@ export class SocketManager {
     this.socket.on('reconnect', () => {
       this.options.onStatusChange('connected')
       this.scheduleTokenRefresh()
+      this.options.onConnect?.()
     })
 
     // Update auth token before each reconnect attempt
