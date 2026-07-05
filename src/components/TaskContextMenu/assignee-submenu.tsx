@@ -52,6 +52,7 @@ export default function AssigneeSubmenu({ task, onTaskUpdate }: Readonly<Assigne
       id: task.id,
       assignee_ids: Array.from(draftAssignedIds),
       previousAssignees: task.assignees,
+      assignees: newAssignees,
     });
   };
 

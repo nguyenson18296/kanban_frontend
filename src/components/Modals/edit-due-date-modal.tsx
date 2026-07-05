@@ -83,6 +83,7 @@ export default function EditDueDateModal({
 
         <Input
           readOnly
+          aria-label="Due date"
           value={formatInputDate(draftDate)}
           placeholder="MM/DD/YYYY"
         />

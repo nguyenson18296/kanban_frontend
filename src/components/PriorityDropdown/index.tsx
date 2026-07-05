@@ -28,6 +28,7 @@ interface PriorityProps {
   const defaultTrigger = (
     <button
       type="button"
+      aria-label={`Priority: ${current.label}`}
       className={cn(
         "mt-2 flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs font-medium transition-colors hover:bg-[#f1f5f9]",
         current.color,

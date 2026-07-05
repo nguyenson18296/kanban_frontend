@@ -1,16 +1,25 @@
 import { io } from 'socket.io-client'
 import type { Socket } from 'socket.io-client'
+import { z } from 'zod/v4'
 import { WS_URL } from '../config/env'
-import type { NotificationType } from '@/types/notification.type'
+import { NotificationType } from '@/types/notification.type'
 
-export interface WsNotification {
-  type: NotificationType
-  actorId: string
-  entityType: string
-  entityId: string
-  payload: Record<string, unknown>
-  createdAt: string
-}
+// Incoming socket payloads cross an untrusted boundary — validate the envelope
+// (not the free-form `payload` contents) before handing it to the app.
+const wsNotificationSchema = z.object({
+  // Derived from the single source of truth (NotificationType) so it can't drift.
+  type: z.enum(NotificationType),
+  actorId: z.string(),
+  entityType: z.string(),
+  entityId: z.string(),
+  payload: z.record(z.string(), z.unknown()),
+  createdAt: z.string(),
+})
+
+const userIdSchema = z.object({ userId: z.string() })
+const messageSchema = z.object({ message: z.string() })
+
+export type WsNotification = z.infer<typeof wsNotificationSchema>
 
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error'
 
@@ -62,19 +71,26 @@ export class SocketManager {
   private registerListeners(): void {
     if (!this.socket) return
 
-    this.socket.on('connection:established', ({ userId }: { userId: string }) => {
+    this.socket.on('connection:established', (raw: unknown) => {
+      const parsed = userIdSchema.safeParse(raw)
       this.options.onStatusChange('connected')
       this.scheduleTokenRefresh()
-      console.debug(`[WS] Connected as user ${userId}`)
+      console.debug(`[WS] Connected as user ${parsed.success ? parsed.data.userId : 'unknown'}`)
     })
 
-    this.socket.on('connection:error', ({ message }: { message: string }) => {
+    this.socket.on('connection:error', (raw: unknown) => {
+      const parsed = messageSchema.safeParse(raw)
       this.options.onStatusChange('error')
-      console.error(`[WS] Connection error: ${message}`)
+      console.error(`[WS] Connection error: ${parsed.success ? parsed.data.message : 'unknown'}`)
     })
 
-    this.socket.on('notification:new', (notification: WsNotification) => {
-      this.options.onNotification(notification)
+    this.socket.on('notification:new', (raw: unknown) => {
+      const parsed = wsNotificationSchema.safeParse(raw)
+      if (!parsed.success) {
+        console.warn('[WS] Dropped malformed notification:new payload', parsed.error)
+        return
+      }
+      this.options.onNotification(parsed.data)
     })
 
     this.socket.on('token:refresh:success', () => {
@@ -82,8 +98,9 @@ export class SocketManager {
       console.debug('[WS] Token refreshed')
     })
 
-    this.socket.on('token:refresh:error', ({ message }: { message: string }) => {
-      console.error(`[WS] Token refresh failed: ${message}`)
+    this.socket.on('token:refresh:error', (raw: unknown) => {
+      const parsed = messageSchema.safeParse(raw)
+      console.error(`[WS] Token refresh failed: ${parsed.success ? parsed.data.message : 'unknown'}`)
     })
 
     this.socket.on('disconnect', (reason: string) => {

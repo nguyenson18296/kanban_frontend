@@ -71,6 +71,7 @@ export default function TaskDetail() {
       id: task.id,
       assignee_ids: assignees.map((a) => a.id),
       previousAssignees: task.assignees,
+      assignees,
     });
   };
 

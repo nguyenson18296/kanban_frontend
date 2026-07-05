@@ -34,7 +34,7 @@ export default function TaskLabelDropdown({
   }, [draft]);
 
   const defaultTrigger = (
-    <Button variant="outline" size="icon" className="size-6 border-none">
+    <Button variant="outline" size="icon" aria-label="Edit labels" className="size-6 border-none">
       <Tag />
     </Button>
   );

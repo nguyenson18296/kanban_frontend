@@ -64,12 +64,13 @@ export default function CommentEditor({ taskId, onCommentCreated }: Readonly<Com
           onChange={handleChange}
         />
         <div className="flex items-center justify-between px-4 py-2 absolute gap-2 bottom-0 right-2">
-          <Button variant="outline" size="icon" className="w-max text-xs size-[30px]">
+          <Button variant="outline" size="icon" aria-label="Attach image" className="w-max text-xs size-[30px]">
             <ImagePlus className="size-4" />
           </Button>
           <Button
             variant="outline"
             size="icon"
+            aria-label="Send comment"
             className="w-max text-xs size-[30px]"
             disabled={isPending}
             onClick={handleCreateComment}
