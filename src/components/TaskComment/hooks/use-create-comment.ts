@@ -20,9 +20,10 @@ export const useCreateComment = (taskId: string) => {
     // Commenting (and @mentioning) auto-subscribes users server-side — reflect
     // it in the subscriber list immediately.
     onMutate: async (content: string) => {
-      await queryClient.cancelQueries({ queryKey: subscribersKey(taskId) });
-      const previousSubscribers = snapshotSubscribers(queryClient, taskId);
+      await queryClient.cancelQueries({ queryKey: subscribersKey(taskId) }); // 1. stop any in-flight GET /subscribers
+      const previousSubscribers = snapshotSubscribers(queryClient, taskId); // 2. snapshot the true pre-mutation cache
 
+      // 3. write the optimistic value: add the commenter + any @mentioned users
       const now = new Date().toISOString();
       const additions: ISubscriber[] = [];
       if (user) additions.push(makeSubscriber(user, "commented", now));

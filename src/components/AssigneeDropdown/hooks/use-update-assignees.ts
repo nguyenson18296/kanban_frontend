@@ -33,8 +33,8 @@ export const useUpdateAssignees = () => {
   >({
     mutationFn: ({ id, assignee_ids }) => updateTaskAssignees(id, assignee_ids),
     onMutate: async ({ id, assignees, previousAssignees }) => {
-      await queryClient.cancelQueries({ queryKey: subscribersKey(id) });
-      const previousSubscribers = snapshotSubscribers(queryClient, id);
+      await queryClient.cancelQueries({ queryKey: subscribersKey(id) }); // 1. stop any in-flight GET /subscribers
+      const previousSubscribers = snapshotSubscribers(queryClient, id); // 2. snapshot the true pre-mutation cache
 
       // Only additions subscribe; removing an assignee does NOT unsubscribe them.
       const prevIds = new Set(previousAssignees.map((a) => a.id));
@@ -44,7 +44,7 @@ export const useUpdateAssignees = () => {
         queryClient,
         id,
         added.map((a) => makeSubscriber(a, "assigned", now)),
-      );
+      ); // 3. write the optimistic value
 
       return { previousSubscribers };
     },

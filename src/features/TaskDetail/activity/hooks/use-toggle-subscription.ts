@@ -43,13 +43,15 @@ export function useToggleSubscription(taskId: string) {
       }
     },
     onMutate: async (nextSubscribed) => {
-      await queryClient.cancelQueries({ queryKey: statusKey });
-      await queryClient.cancelQueries({ queryKey: subscribersKey(taskId) });
+      await queryClient.cancelQueries({ queryKey: statusKey }); // 1. stop any in-flight GET /subscription/me
+      await queryClient.cancelQueries({ queryKey: subscribersKey(taskId) }); // 1. ...and GET /subscribers
 
+      // 2. snapshot the true pre-mutation cache (restored in onError)
       const previousStatus =
         queryClient.getQueryData<ISubscriptionStatus>(statusKey);
       const previousSubscribers = snapshotSubscribers(queryClient, taskId);
 
+      // 3. write the optimistic value: flip the status + add/remove the current user
       const now = new Date().toISOString();
       queryClient.setQueryData<ISubscriptionStatus>(statusKey, {
         subscribed: nextSubscribed,
