@@ -5,6 +5,7 @@ import { useStoreUser } from '../../stores/use-store-user';
 import { DEFAULT_SETTINGS_SECTION, isSettingsSection } from '@/constants/settings-sections';
 
 import SidebarSettingsNav from './settings-nav';
+import ProjectSwitcher from '@/components/ProjectSwitcher';
 
 const imgBrandLogo = 'https://www.figma.com/api/mcp/asset/acf68363-8ae7-4d86-90f0-1a5ca540a07f';
 
@@ -41,6 +42,9 @@ export default function Sidebar() {
             <div className="text-xs font-medium leading-4 text-[#94a3b8]">Pro Workspace</div>
           </div>
         </div>
+
+        {/* Project switcher — hidden inside Settings, which swaps to its own nav */}
+        {isSettings ? null : <ProjectSwitcher />}
 
         {/* Navigation — settings sections while inside Settings, main menu otherwise */}
         {isSettings ? (
