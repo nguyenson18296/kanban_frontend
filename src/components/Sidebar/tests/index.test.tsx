@@ -34,6 +34,12 @@ vi.mock('@/components/AssigneeDropdown/hooks/use-get-users', () => ({
   useGetUsers: () => ({ data: users }),
 }));
 
+// ProjectSwitcher fetches via TanStack Query and needs a provider — its own
+// behavior is covered in its colocated tests, so stub it here.
+vi.mock('@/components/ProjectSwitcher', () => ({
+  default: () => <div data-testid="project-switcher" />,
+}));
+
 beforeEach(() => {
   pathname = '/dashboard';
   users = [];
@@ -47,6 +53,16 @@ afterEach(() => {
 });
 
 describe('Sidebar', () => {
+  it('shows the project switcher outside settings but not inside settings', () => {
+    render(<Sidebar />);
+    expect(screen.getByTestId('project-switcher')).toBeInTheDocument();
+    cleanup();
+
+    pathname = '/settings/profile';
+    render(<Sidebar />);
+    expect(screen.queryByTestId('project-switcher')).not.toBeInTheDocument();
+  });
+
   it('shows the main menu and the Settings entry outside /settings', () => {
     render(<Sidebar />);
     const main = screen.getByRole('navigation', { name: 'Main' });

@@ -4,6 +4,7 @@ import type { IBoard, TAssignee, Priority } from '@/types';
 interface IStoreKanbanBoard {
   kanbanBoard: IBoard | null;
   setKanbanBoard: (kanbanBoard: IBoard) => void;
+  clearKanbanBoard: () => void;
   updateTaskAssignees: (taskId: string, assignees: TAssignee[]) => void;
   moveTask: (taskId: string, fromColumnId: number, toColumnId: number, position: number) => void;
   reorderTask: (columnId: number, taskId: string, newPosition: number) => void;
@@ -15,6 +16,8 @@ interface IStoreKanbanBoard {
 export const useStoreKanbanBoard = create<IStoreKanbanBoard>((set) => ({
   kanbanBoard: null,
   setKanbanBoard: (kanbanBoard: IBoard) => set({ kanbanBoard: kanbanBoard }),
+  // Used when switching projects so the previous project's board never flashes.
+  clearKanbanBoard: () => set({ kanbanBoard: null }),
   // IMPORTANT: Zustand uses referential equality to detect changes.
   // Always return NEW objects — never mutate in place.
   // e.g. `task.assignees = x; return state` won't trigger a re-render
