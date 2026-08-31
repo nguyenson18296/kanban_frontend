@@ -1,14 +1,16 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { Mail, Plus, Search, UserPlus, X } from 'lucide-react';
 
-import { useGetUsers } from '@/components/AssigneeDropdown/hooks/use-get-users';
 import { UserAvatar } from '@/components/UserAvatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useStoreActiveProject } from '@/stores/use-store-active-project';
 import { useStoreUser } from '@/stores/use-store-user';
-import type { IUser } from '@/types';
+import type { IProjectMember } from '@/types';
+
+import { useGetProjectMembers } from '../hooks/use-get-project-members';
 
 import { IconTile } from '../components/icon-tile';
 import { SettingsPageHeader } from '../components/page-header';
@@ -23,7 +25,8 @@ import InviteDialog, {
 
 const SEAT_LIMIT = 25;
 
-// Until a projects endpoint exists, offer the boards the invite can grant.
+// Placeholder until the invites API lands; real names are available via
+// useGetProjects (ProjectSwitcher) once invites are wired to the backend.
 const INVITE_PROJECTS = ['Mobile app relaunch', 'Website redesign', 'Q3 roadmap', 'Design system'];
 
 // Placeholder pending invites until an invites API exists.
@@ -32,19 +35,34 @@ const SEED_INVITES: readonly PendingInvite[] = [
   { id: 'inv-2', email: 'design@studio-nord.com', role: 'Guest', sent: 'Invited 6 days ago · reminder sent' },
 ];
 
-/** Map the backend's free-form role string onto the roles the UI can assign. */
+/** Map the backend's project role ("owner" | "admin" | "member" | …) onto the roles the UI can assign. */
 function normalizeRole(role: string | undefined): MemberRole {
-  const match = MEMBER_ROLES.find((candidate) => candidate.toLowerCase() === role?.toLowerCase());
+  const lower = role?.toLowerCase();
+  if (lower === 'owner') return 'Admin';
+  const match = MEMBER_ROLES.find((candidate) => candidate.toLowerCase() === lower);
   return match ?? 'Member';
 }
 
 export default function Members() {
+  // Remount the project-scoped body whenever the active project changes so the
+  // local state below (role overrides, removals, search, seed invites) never
+  // bleeds from one project into another — reset by key, not a syncing effect.
+  const projectId = useStoreActiveProject((s) => s.activeProjectId);
+  return <MembersForProject key={projectId ?? 'none'} projectId={projectId} />;
+}
+
+interface MembersForProjectProps {
+  projectId: string | null;
+}
+
+function MembersForProject({ projectId }: MembersForProjectProps) {
   const currentUserId = useStoreUser((s) => s.user?.id);
-  const { data: users, isLoading, isError, refetch } = useGetUsers();
+  const resendHintId = useId();
+  const { data: memberships, isLoading, isError, refetch } = useGetProjectMembers(projectId);
 
   const [search, setSearch] = useState('');
-  // Local overrides only — there's no members API yet, so role changes and
-  // removals are optimistic UI derived on top of the fetched list.
+  // Local overrides only — there's no members mutation API yet, so role changes
+  // and removals are optimistic UI derived on top of the fetched list.
   const [roleOverrides, setRoleOverrides] = useState<ReadonlyMap<string, MemberRole>>(() => new Map());
   const [removedIds, setRemovedIds] = useState<ReadonlySet<string>>(() => new Set());
   const [invites, setInvites] = useState<readonly PendingInvite[]>(SEED_INVITES);
@@ -54,12 +72,13 @@ export default function Members() {
   const [domainJoin, setDomainJoin] = useState(false);
   const [guestsSeeAll, setGuestsSeeAll] = useState(true);
 
-  const members = (users ?? []).filter((user) => !removedIds.has(user.id));
+  const members = (memberships ?? []).filter((member) => !removedIds.has(member.user.id));
   const query = search.trim().toLowerCase();
   const visibleMembers = query
     ? members.filter(
-        (user) =>
-          user.full_name.toLowerCase().includes(query) || user.email.toLowerCase().includes(query),
+        (member) =>
+          member.user.full_name.toLowerCase().includes(query) ||
+          member.user.email.toLowerCase().includes(query),
       )
     : members;
 
@@ -117,7 +136,11 @@ export default function Members() {
         </div>
 
         <div className="mt-4 flex flex-col *:border-t">
-          {isLoading ? (
+          {!projectId ? (
+            <p className="px-6 py-6 text-sm text-muted-foreground">
+              Select a project to see its members.
+            </p>
+          ) : isLoading ? (
             <p className="px-6 py-6 text-sm text-muted-foreground" role="status">
               Loading members…
             </p>
@@ -136,14 +159,14 @@ export default function Members() {
             </p>
           ) : (
             <ul className="flex flex-col *:border-t *:first:border-t-0">
-              {visibleMembers.map((user) => (
+              {visibleMembers.map((member) => (
                 <MemberRow
-                  key={user.id}
-                  user={user}
-                  role={roleOverrides.get(user.id) ?? normalizeRole(user.role)}
-                  isCurrentUser={user.id === currentUserId}
-                  onRoleChange={(role) => setRole(user.id, role)}
-                  onRemove={() => removeMember(user.id)}
+                  key={member.user.id}
+                  user={member.user}
+                  role={roleOverrides.get(member.user.id) ?? normalizeRole(member.role)}
+                  isCurrentUser={member.user.id === currentUserId}
+                  onRoleChange={(role) => setRole(member.user.id, role)}
+                  onRemove={() => removeMember(member.user.id)}
                 />
               ))}
             </ul>
@@ -161,6 +184,9 @@ export default function Members() {
           </Button>
         }
       >
+        <span id={resendHintId} className="sr-only">
+          Resending invites isn't available yet.
+        </span>
         <div className="mt-4 flex flex-col *:border-t">
           {invites.length === 0 ? (
             <p className="px-6 py-6 text-sm text-muted-foreground">No pending invites.</p>
@@ -176,7 +202,14 @@ export default function Members() {
                     </p>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <Button type="button" variant="ghost" size="sm" disabled title="Resending isn't available yet">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      disabled
+                      title="Resending isn't available yet"
+                      aria-describedby={resendHintId}
+                    >
                       Resend
                     </Button>
                     <Button
@@ -238,7 +271,7 @@ export default function Members() {
 }
 
 interface MemberRowProps {
-  user: IUser;
+  user: IProjectMember['user'];
   role: MemberRole;
   isCurrentUser: boolean;
   onRoleChange: (role: MemberRole) => void;
