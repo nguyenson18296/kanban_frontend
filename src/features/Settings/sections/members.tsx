@@ -8,20 +8,18 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useStoreActiveProject } from '@/stores/use-store-active-project';
 import { useStoreUser } from '@/stores/use-store-user';
-import type { IProjectMember } from '@/types';
+import type { IProjectMember, ProjectRole } from '@/types';
 
 import { useGetProjectMembers } from '../hooks/use-get-project-members';
+import { useUpdateMemberRole } from '../hooks/use-update-member-role';
+import { ROLE_LABELS, assignableRoles, isProjectRole, normalizeProjectRole } from '../member-roles';
 
 import { IconTile } from '../components/icon-tile';
 import { SettingsPageHeader } from '../components/page-header';
 import { SwitchRow } from '../components/setting-row';
 import { SettingRows, SettingsCard } from '../components/settings-card';
 import { UsageMeter } from '../components/usage-meter';
-import InviteDialog, {
-  MEMBER_ROLES,
-  type MemberRole,
-  type PendingInvite,
-} from './invite-dialog';
+import InviteDialog, { type PendingInvite } from './invite-dialog';
 
 const SEAT_LIMIT = 25;
 
@@ -35,18 +33,10 @@ const SEED_INVITES: readonly PendingInvite[] = [
   { id: 'inv-2', email: 'design@studio-nord.com', role: 'Guest', sent: 'Invited 6 days ago · reminder sent' },
 ];
 
-/** Map the backend's project role ("owner" | "admin" | "member" | …) onto the roles the UI can assign. */
-function normalizeRole(role: string | undefined): MemberRole {
-  const lower = role?.toLowerCase();
-  if (lower === 'owner') return 'Admin';
-  const match = MEMBER_ROLES.find((candidate) => candidate.toLowerCase() === lower);
-  return match ?? 'Member';
-}
-
 export default function Members() {
   // Remount the project-scoped body whenever the active project changes so the
-  // local state below (role overrides, removals, search, seed invites) never
-  // bleeds from one project into another — reset by key, not a syncing effect.
+  // local state below (removals, search, seed invites) never bleeds from one
+  // project into another — reset by key, not a syncing effect.
   const projectId = useStoreActiveProject((s) => s.activeProjectId);
   return <MembersForProject key={projectId ?? 'none'} projectId={projectId} />;
 }
@@ -60,10 +50,15 @@ function MembersForProject({ projectId }: MembersForProjectProps) {
   const resendHintId = useId();
   const { data: memberships, isLoading, isError, refetch } = useGetProjectMembers(projectId);
 
+  const {
+    mutate: changeRole,
+    isPending: isRoleSaving,
+    variables: roleVariables,
+  } = useUpdateMemberRole(projectId);
+
   const [search, setSearch] = useState('');
-  // Local overrides only — there's no members mutation API yet, so role changes
-  // and removals are optimistic UI derived on top of the fetched list.
-  const [roleOverrides, setRoleOverrides] = useState<ReadonlyMap<string, MemberRole>>(() => new Map());
+  // Removals are still local-only (no remove-member API wired yet); role
+  // changes are real — optimistic via the Query cache in useUpdateMemberRole.
   const [removedIds, setRemovedIds] = useState<ReadonlySet<string>>(() => new Set());
   const [invites, setInvites] = useState<readonly PendingInvite[]>(SEED_INVITES);
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -82,8 +77,11 @@ function MembersForProject({ projectId }: MembersForProjectProps) {
       )
     : members;
 
-  const setRole = (id: string, role: MemberRole) =>
-    setRoleOverrides((prev) => new Map(prev).set(id, role));
+  // The actor's own membership decides what they may edit — UX gating only;
+  // the backend re-checks every change (JAV-14).
+  const actorMembership = (memberships ?? []).find((member) => member.user.id === currentUserId);
+  const actorRole = actorMembership ? normalizeProjectRole(actorMembership.role) : null;
+
   const removeMember = (id: string) =>
     setRemovedIds((prev) => new Set(prev).add(id));
   const revokeInvite = (id: string) =>
@@ -159,16 +157,23 @@ function MembersForProject({ projectId }: MembersForProjectProps) {
             </p>
           ) : (
             <ul className="flex flex-col *:border-t *:first:border-t-0">
-              {visibleMembers.map((member) => (
-                <MemberRow
-                  key={member.user.id}
-                  user={member.user}
-                  role={roleOverrides.get(member.user.id) ?? normalizeRole(member.role)}
-                  isCurrentUser={member.user.id === currentUserId}
-                  onRoleChange={(role) => setRole(member.user.id, role)}
-                  onRemove={() => removeMember(member.user.id)}
-                />
-              ))}
+              {visibleMembers.map((member) => {
+                const role = normalizeProjectRole(member.role);
+                const isCurrentUser = member.user.id === currentUserId;
+                return (
+                  <MemberRow
+                    key={member.user.id}
+                    user={member.user}
+                    role={role}
+                    roleOptions={assignableRoles(actorRole, role, isCurrentUser)}
+                    isCurrentUser={isCurrentUser}
+                    isSaving={isRoleSaving && roleVariables?.userId === member.user.id}
+                    isMutating={isRoleSaving}
+                    onRoleChange={(next) => changeRole({ userId: member.user.id, role: next })}
+                    onRemove={() => removeMember(member.user.id)}
+                  />
+                );
+              })}
             </ul>
           )}
         </div>
@@ -272,14 +277,26 @@ function MembersForProject({ projectId }: MembersForProjectProps) {
 
 interface MemberRowProps {
   user: IProjectMember['user'];
-  role: MemberRole;
+  role: ProjectRole;
+  /** Roles the current user may assign to this row; empty = read-only role. */
+  roleOptions: readonly ProjectRole[];
   isCurrentUser: boolean;
-  onRoleChange: (role: MemberRole) => void;
+  /** This row's role change is the one in flight — drives `aria-busy`. */
+  isSaving: boolean;
+  /**
+   * ANY role change is in flight. Disables every role select: the shared
+   * useMutation only tracks its latest call, so allowing a second change
+   * mid-flight would re-enable the first row early and let overlapping
+   * optimistic snapshots clobber each other on revert.
+   */
+  isMutating: boolean;
+  onRoleChange: (role: ProjectRole) => void;
   onRemove: () => void;
 }
 
-function MemberRow({ user, role, isCurrentUser, onRoleChange, onRemove }: MemberRowProps) {
+function MemberRow({ user, role, roleOptions, isCurrentUser, isSaving, isMutating, onRoleChange, onRemove }: MemberRowProps) {
   const displayName = user.full_name.trim() || 'Unknown user';
+  const canEditRole = roleOptions.length > 0;
   return (
     <li className="flex flex-wrap items-center gap-3.5 px-6 py-3.5">
       <UserAvatar user={user} size="lg" isOnline={isCurrentUser ? true : undefined} />
@@ -289,34 +306,38 @@ function MemberRow({ user, role, isCurrentUser, onRoleChange, onRemove }: Member
           {isCurrentUser ? (
             <Badge className="bg-primary/10 text-[10.5px] font-bold text-primary">You</Badge>
           ) : null}
-          {role === 'Guest' ? (
-            <Badge variant="outline" className="text-[10.5px] text-muted-foreground">
-              Guest
-            </Badge>
-          ) : null}
         </div>
         <p className="mt-0.5 text-sm text-muted-foreground">{user.email}</p>
       </div>
       <div className="flex items-center gap-2">
-        <Select
-          value={role}
-          onValueChange={(next) => {
-            const match = MEMBER_ROLES.find((candidate) => candidate === next);
-            if (match) onRoleChange(match);
-          }}
-          disabled={isCurrentUser}
-        >
-          <SelectTrigger size="sm" className="w-[110px]" aria-label={`Role for ${displayName}`}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {MEMBER_ROLES.map((candidate) => (
-              <SelectItem key={candidate} value={candidate}>
-                {candidate}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {canEditRole ? (
+          <Select
+            value={role}
+            onValueChange={(next) => {
+              // Same-role picks are a no-op — don't fire a request for them.
+              if (isProjectRole(next) && next !== role) onRoleChange(next);
+            }}
+            disabled={isMutating}
+          >
+            <SelectTrigger
+              size="sm"
+              className="w-[110px]"
+              aria-label={`Role for ${displayName}`}
+              aria-busy={isSaving}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {roleOptions.map((candidate) => (
+                <SelectItem key={candidate} value={candidate}>
+                  {ROLE_LABELS[candidate]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : (
+          <span className="w-[110px] px-3 text-sm text-muted-foreground">{ROLE_LABELS[role]}</span>
+        )}
         <Button
           type="button"
           variant="outline"

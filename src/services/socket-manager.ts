@@ -2,6 +2,7 @@ import { io } from 'socket.io-client'
 import type { Socket } from 'socket.io-client'
 import { z } from 'zod/v4'
 import { WS_URL } from '../config/env'
+import { decodeJwt } from '@/lib/jwt'
 import { NotificationType } from '@/types/notification.type'
 import type { IPresenceUpdate } from '@/types'
 
@@ -23,6 +24,21 @@ const messageSchema = z.object({ message: z.string() })
 export type WsNotification = z.infer<typeof wsNotificationSchema>
 
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error'
+
+// Reconnects must not burn a refresh-token rotation while the current access
+// token is still valid (JAV-28) — refresh only inside this expiry margin.
+const TOKEN_EXPIRY_MARGIN_S = 60
+
+/** True when the token can't be trusted for a reconnect: undecodable or expiring within the margin. */
+function needsRefresh(token: string): boolean {
+  try {
+    const { exp } = decodeJwt(token)
+    if (!exp) return false // no expiry claim — a refresh wouldn't improve anything
+    return exp - Math.floor(Date.now() / 1000) < TOKEN_EXPIRY_MARGIN_S
+  } catch {
+    return true // undecodable — let the refresh flow replace it
+  }
+}
 
 interface SocketManagerOptions {
   getAccessToken: () => string | null
@@ -130,9 +146,16 @@ export class SocketManager {
       this.options.onConnect?.()
     })
 
-    // Update auth token before each reconnect attempt
+    // Update the auth token before each reconnect attempt. Reuse the current
+    // access token while it's valid — refreshing unconditionally here fired one
+    // POST /auth/refresh per retry whenever the WS server was down (JAV-28).
     this.socket.io.on('reconnect_attempt', async () => {
       try {
+        const current = this.options.getAccessToken()
+        if (current && !needsRefresh(current)) {
+          if (this.socket) this.socket.auth = { token: current }
+          return
+        }
         const newToken = await this.options.refreshAccessToken()
         if (this.socket && newToken) {
           this.socket.auth = { token: newToken }
