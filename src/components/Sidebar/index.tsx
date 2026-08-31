@@ -2,6 +2,9 @@ import { useLocation } from '@tanstack/react-router';
 import { Home, LayoutGrid, Calendar, FileText, Users, Settings } from 'lucide-react';
 
 import { useStoreUser } from '../../stores/use-store-user';
+import { DEFAULT_SETTINGS_SECTION, isSettingsSection } from '@/constants/settings-sections';
+
+import SidebarSettingsNav from './settings-nav';
 
 const imgBrandLogo = 'https://www.figma.com/api/mcp/asset/acf68363-8ae7-4d86-90f0-1a5ca540a07f';
 
@@ -17,6 +20,13 @@ const navItems = [
 export default function Sidebar() {
   const location = useLocation();
   const { user } = useStoreUser();
+
+  // Under /settings the main menu is replaced by the settings sections + a Back link.
+  const settingsMatch = /^\/settings(?:\/([^/]+))?/.exec(location.pathname);
+  const isSettings = settingsMatch !== null;
+  const rawSection = settingsMatch?.[1] ?? '';
+  const settingsSection = isSettingsSection(rawSection) ? rawSection : DEFAULT_SETTINGS_SECTION;
+
   return (
     <aside className="flex w-[256px] shrink-0 flex-col justify-between border-r border-[#1e293b] bg-[#0f172a] p-6">
       {/* Top */}
@@ -32,34 +42,40 @@ export default function Sidebar() {
           </div>
         </div>
 
-        {/* Navigation */}
-        <nav className="mt-6 flex flex-col gap-2">
-          {navItems.map((item) => (
-            <a
-              key={item.label}
-              href={item.href}
-              className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium leading-5 no-underline transition-colors ${
-                location.pathname === item.href
-                  ? 'bg-[#5a5cf2] text-white'
-                  : 'text-[#cbd5e1] hover:bg-white/5 hover:text-white'
-              }`}
-            > 
-              <item.icon className="h-[18px] w-[18px]" />
-              {item.label}
-            </a>
-          ))}
-        </nav>
+        {/* Navigation — settings sections while inside Settings, main menu otherwise */}
+        {isSettings ? (
+          <SidebarSettingsNav current={settingsSection} />
+        ) : (
+          <nav aria-label="Main" className="mt-6 flex flex-col gap-2">
+            {navItems.map((item) => (
+              <a
+                key={item.label}
+                href={item.href}
+                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium leading-5 no-underline transition-colors ${
+                  location.pathname === item.href
+                    ? 'bg-[#5a5cf2] text-white'
+                    : 'text-[#cbd5e1] hover:bg-white/5 hover:text-white'
+                }`}
+              > 
+                <item.icon className="h-[18px] w-[18px]" />
+                {item.label}
+              </a>
+            ))}
+          </nav>
+        )}
       </div>
 
       {/* Bottom */}
       <div className="flex flex-col gap-4">
-        <a
-          href="/settings"
-          className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium leading-5 text-[#cbd5e1] no-underline transition-colors hover:bg-white/5 hover:text-white"
-        >
-          <Settings className="h-[18px] w-[18px]" />
-          Settings
-        </a>
+        {isSettings ? null : (
+          <a
+            href="/settings"
+            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium leading-5 text-[#cbd5e1] no-underline transition-colors hover:bg-white/5 hover:text-white"
+          >
+            <Settings className="h-[18px] w-[18px]" />
+            Settings
+          </a>
+        )}
 
         <div className="border-t border-[#334155] pt-4">
           <div className="flex items-center gap-3">
