@@ -10,6 +10,9 @@ interface IProject {
   updated_at: string;
 }
 
+/** Backend project role, highest first — see `features/Settings/member-roles.ts` for rank/policy helpers. */
+type ProjectRole = 'owner' | 'admin' | 'member' | 'viewer';
+
 /** One row of `GET /projects/:projectId/members` — the membership plus the member's profile. */
 interface IProjectMember {
   project_id: string;
@@ -30,4 +33,4 @@ interface IProjectMembersResponse {
   success: boolean;
 }
 
-export type { IProject, IProjectMember, IProjectMembersResponse };
+export type { IProject, IProjectMember, IProjectMembersResponse, ProjectRole };
