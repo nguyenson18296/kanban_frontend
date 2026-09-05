@@ -32,7 +32,9 @@ function normalizeProjectRole(role: string | undefined): ProjectRole {
  * (PATCH /projects/:id/members/:userId, JAV-14) is the enforcement layer.
  * Mirrors its policy: base gate admin; touching owner/admin in either
  * direction is owner-only; no self-change. The owner role itself is never
- * assignable or removable from this UI (ownership transfer is out of scope).
+ * offered by this dropdown — it can't be granted, and an owner can't be
+ * demoted (ownership transfer is out of scope). Removing someone from the
+ * project entirely — owners included — is `canRemoveMember`'s policy below.
  * An empty result means the row is read-only.
  */
 function assignableRoles(
@@ -48,4 +50,22 @@ function assignableRoles(
   return ADMIN_ASSIGNABLE;
 }
 
-export { ROLE_LABELS, assignableRoles, isProjectRole, normalizeProjectRole };
+/**
+ * Whether the actor may remove the target from the project — UX gating only;
+ * DELETE /projects/:id/members (JAV-15) is the enforcement layer. Mirrors its
+ * policy: self-leave is allowed at any role; removing a member/viewer needs
+ * admin+; removing an admin/owner needs owner. The backend's last-owner guard
+ * (409) can't be decided per-row here — the server rejects it.
+ */
+function canRemoveMember(
+  actorRole: ProjectRole | null,
+  targetRole: ProjectRole,
+  isSelf: boolean,
+): boolean {
+  if (!actorRole) return false;
+  if (isSelf) return true;
+  const requiredRank = ROLE_RANK[targetRole] >= ROLE_RANK.admin ? ROLE_RANK.owner : ROLE_RANK.admin;
+  return ROLE_RANK[actorRole] >= requiredRank;
+}
+
+export { ROLE_LABELS, assignableRoles, canRemoveMember, isProjectRole, normalizeProjectRole };

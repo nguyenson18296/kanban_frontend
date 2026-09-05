@@ -1,12 +1,13 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReactNode } from 'react';
 
 import Members from '../sections/members';
 import { HttpError } from '@/lib/http-client';
-import { getProjectMembers, updateMemberRole } from '@/services/project.service';
+import { getProjectMembers, removeProjectMembers, updateMemberRole } from '@/services/project.service';
 import { createUser } from '@/test-factories';
 import { useStoreActiveProject } from '@/stores/use-store-active-project';
 import { useStoreUser } from '@/stores/use-store-user';
@@ -17,7 +18,17 @@ import type { IProjectMember, IProjectMembersResponse, IUser } from '@/types';
 // envelope unwrap, optimistic cache writes and error revert are exercised too.
 vi.mock('@/services/project.service');
 
-// Presence hover-card + Radix Select are stubbed; the row logic is under test.
+// Removal errors surface through sonner — assert the messages on the mock.
+vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
+
+// members.tsx only pulls useNavigate from the router; no RouterProvider here.
+const mockNavigate = vi.fn();
+vi.mock('@tanstack/react-router', () => ({
+  useNavigate: () => mockNavigate,
+}));
+
+// Presence hover-card + Radix Select/Dialog portals are stubbed; the row and
+// confirm-flow logic is under test.
 vi.mock('@/components/UserAvatar', () => ({
   UserAvatar: ({ user }: { user: IUser }) => <span data-testid="avatar">{user.full_name}</span>,
 }));
@@ -61,6 +72,16 @@ vi.mock('@/components/ui/select', () => ({
   SelectItem: ({ value }: { value: string }) => <span data-testid="option">{value}</span>,
 }));
 
+vi.mock('@/components/ui/dialog', () => ({
+  Dialog: ({ open, children }: { open: boolean; children: ReactNode }) =>
+    open ? <div role="dialog">{children}</div> : null,
+  DialogContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DialogHeader: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DialogFooter: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DialogTitle: ({ children }: { children: ReactNode }) => <h2>{children}</h2>,
+  DialogDescription: ({ children }: { children: ReactNode }) => <p>{children}</p>,
+}));
+
 vi.mock('../sections/invite-dialog', async (importOriginal) => {
   const original = await importOriginal<typeof import('../sections/invite-dialog')>();
   return {
@@ -88,6 +109,13 @@ const members = [
   makeMember(createUser({ id: 'u3', full_name: 'Tom Fischer', email: 'tom@contractor.dev' }), 'contractor'),
 ];
 
+// Olive owns the project; Ava (current user) is a plain member who may leave.
+const memberWorld = [
+  makeMember(createUser({ id: 'u9', full_name: 'Olive Winters', email: 'olive@flowboard.io' }), 'owner'),
+  makeMember(createUser({ id: 'u1', full_name: 'Ava Chen', email: 'ava@flowboard.io' }), 'member'),
+  makeMember(createUser({ id: 'u2', full_name: 'Marcus Reid', email: 'marcus@flowboard.io' }), 'member'),
+];
+
 const membersResponse = (data: IProjectMember[], success = true): IProjectMembersResponse => ({
   data,
   status: 200,
@@ -113,6 +141,7 @@ function renderMembers() {
 beforeEach(() => {
   vi.mocked(getProjectMembers).mockResolvedValue(membersResponse(members));
   vi.mocked(updateMemberRole).mockResolvedValue(members[1]);
+  vi.mocked(removeProjectMembers).mockResolvedValue(undefined);
   useStoreActiveProject.getState().setActiveProjectId('proj-1');
   useStoreUser.getState().setUser({ id: 'u1', email: 'ava@flowboard.io', full_name: 'Ava Chen', role: 'admin', avatar_url: '' });
 });
@@ -125,12 +154,14 @@ afterEach(() => {
 });
 
 describe('Members', () => {
-  it('lists members with the seat count, marks the current user, and locks their controls', async () => {
+  it('lists members with the seat count, marks the current user, and offers Leave on their row', async () => {
     renderMembers();
     expect(await screen.findByText('3 of 25 seats used on Flowboard Pro')).toBeInTheDocument();
     expect(screen.getAllByTestId('avatar')).toHaveLength(3);
     expect(screen.getByText('You')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Remove Ava Chen' })).toBeDisabled();
+    // The current user's row swaps Remove for Leave; other rows keep Remove.
+    expect(screen.queryByRole('button', { name: 'Remove Ava Chen' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Leave project' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Remove Marcus Reid' })).toBeEnabled();
     // The current user's own role is read-only text — no dropdown, even for the owner.
     expect(screen.getAllByTestId('select')).toHaveLength(2);
@@ -151,7 +182,7 @@ describe('Members', () => {
     expect(optionsOf(selects[0])).toEqual(['admin', 'member', 'viewer']);
   });
 
-  it('lets an admin edit only members/viewers — not the owner or fellow admins', async () => {
+  it('lets an admin edit and remove only members/viewers — not the owner or fellow admins', async () => {
     const world = [
       makeMember(createUser({ id: 'u1', full_name: 'Ava Chen', email: 'ava@flowboard.io' }), 'admin'),
       makeMember(createUser({ id: 'u9', full_name: 'Olive Winters', email: 'olive@flowboard.io' }), 'owner'),
@@ -166,19 +197,21 @@ describe('Members', () => {
     expect(optionsOf(selects[0])).toEqual(['member', 'viewer']);
     expect(screen.getByText('Owner')).toBeInTheDocument(); // Olive, read-only
     expect(screen.getAllByText('Admin')).toHaveLength(2); // Ava (self) + Marcus, read-only
+    // Removal mirrors JAV-15: admin may remove members/viewers, never admins/owners.
+    expect(screen.getByRole('button', { name: 'Remove Tom Fischer' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Remove Olive Winters' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Remove Marcus Reid' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Leave project' })).toBeEnabled();
   });
 
-  it('shows every role read-only to a plain member', async () => {
-    const world = [
-      makeMember(createUser({ id: 'u9', full_name: 'Olive Winters', email: 'olive@flowboard.io' }), 'owner'),
-      makeMember(createUser({ id: 'u1', full_name: 'Ava Chen', email: 'ava@flowboard.io' }), 'member'),
-      makeMember(createUser({ id: 'u2', full_name: 'Marcus Reid', email: 'marcus@flowboard.io' }), 'member'),
-    ];
-    vi.mocked(getProjectMembers).mockResolvedValue(membersResponse(world));
+  it('shows every role read-only to a plain member, with Leave as their only control', async () => {
+    vi.mocked(getProjectMembers).mockResolvedValue(membersResponse(memberWorld));
     renderMembers();
 
     await screen.findAllByTestId('avatar');
     expect(screen.queryAllByTestId('select')).toHaveLength(0);
+    expect(screen.queryByRole('button', { name: /^Remove / })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Leave project' })).toBeEnabled();
   });
 
   it('PATCHes the new role and shows it optimistically', async () => {
@@ -301,13 +334,120 @@ describe('Members', () => {
     expect(screen.getByText('No one matches that search.')).toBeInTheDocument();
   });
 
-  it('removes a member locally and updates the seat line', async () => {
+  it('confirms, DELETEs the member, and updates the list and seat line optimistically', async () => {
     const user = userEvent.setup();
     renderMembers();
     await user.click(await screen.findByRole('button', { name: 'Remove Marcus Reid' }));
 
-    expect(screen.queryByText('Marcus Reid')).not.toBeInTheDocument();
+    // Destructive action gates behind an explicit confirm.
+    expect(screen.getByRole('dialog')).toHaveTextContent('Remove Marcus Reid?');
+    expect(vi.mocked(removeProjectMembers)).not.toHaveBeenCalled();
+
+    // After the optimistic write settles, the refetch confirms the removal.
+    vi.mocked(getProjectMembers).mockResolvedValue(membersResponse([members[0], members[2]]));
+    await user.click(screen.getByRole('button', { name: 'Remove member' }));
+
+    expect(vi.mocked(removeProjectMembers)).toHaveBeenCalledWith('proj-1', ['u2']);
+    await waitFor(() => {
+      expect(screen.queryByText('Marcus Reid')).not.toBeInTheDocument();
+    });
     expect(screen.getByText('2 of 25 seats used on Flowboard Pro')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('cancelling the confirm dialog fires no request', async () => {
+    const user = userEvent.setup();
+    renderMembers();
+    await user.click(await screen.findByRole('button', { name: 'Remove Marcus Reid' }));
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(vi.mocked(removeProjectMembers)).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Remove Marcus Reid' })).toBeInTheDocument();
+  });
+
+  it('reverts the optimistic removal and toasts when the server rejects it', async () => {
+    const user = userEvent.setup();
+    vi.mocked(removeProjectMembers).mockRejectedValue(
+      new HttpError(403, 'DELETE /projects/proj-1/members failed with status 403', {
+        statusCode: 403,
+        message: 'This action requires at least admin role',
+      }),
+    );
+    renderMembers();
+    await user.click(await screen.findByRole('button', { name: 'Remove Marcus Reid' }));
+    await user.click(screen.getByRole('button', { name: 'Remove member' }));
+
+    expect(vi.mocked(removeProjectMembers)).toHaveBeenCalledWith('proj-1', ['u2']);
+    // The 403 race (actor demoted mid-flight) reverts the row and surfaces the server message.
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Remove Marcus Reid' })).toBeInTheDocument();
+    });
+    expect(vi.mocked(toast.error)).toHaveBeenCalledWith('This action requires at least admin role');
+  });
+
+  it('self-leave DELETEs your own id, clears the active project and redirects', async () => {
+    const user = userEvent.setup();
+    vi.mocked(getProjectMembers).mockResolvedValue(membersResponse(memberWorld));
+    renderMembers();
+    await user.click(await screen.findByRole('button', { name: 'Leave project' }));
+
+    expect(screen.getByRole('dialog')).toHaveTextContent('Leave this project?');
+    await user.click(screen.getByRole('button', { name: 'Leave this project' }));
+
+    expect(vi.mocked(removeProjectMembers)).toHaveBeenCalledWith('proj-1', ['u1']);
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith({ to: '/dashboard' });
+    });
+    expect(useStoreActiveProject.getState().activeProjectId).toBeNull();
+  });
+
+  it('surfaces the last-owner 409 with a transfer-ownership hint and stays put', async () => {
+    const user = userEvent.setup();
+    vi.mocked(removeProjectMembers).mockRejectedValue(
+      new HttpError(409, 'DELETE /projects/proj-1/members failed with status 409', {
+        statusCode: 409,
+        message: 'A project must have at least one owner',
+      }),
+    );
+    renderMembers();
+    await user.click(await screen.findByRole('button', { name: 'Leave project' }));
+    await user.click(screen.getByRole('button', { name: 'Leave this project' }));
+
+    await waitFor(() => {
+      expect(vi.mocked(toast.error)).toHaveBeenCalledWith(
+        expect.stringContaining('transfer ownership'),
+      );
+    });
+    // The sole owner stays a member; nothing navigates away.
+    expect(screen.getByText('You')).toBeInTheDocument();
+    expect(mockNavigate).not.toHaveBeenCalled();
+    expect(useStoreActiveProject.getState().activeProjectId).toBe('proj-1');
+  });
+
+  it('locks every mutation control while a removal is in flight', async () => {
+    const user = userEvent.setup();
+    let resolveRemove!: () => void;
+    vi.mocked(removeProjectMembers).mockImplementation(
+      () => new Promise<void>((resolve) => { resolveRemove = () => resolve(undefined); }),
+    );
+    renderMembers();
+    await user.click(await screen.findByRole('button', { name: 'Remove Marcus Reid' }));
+    await user.click(screen.getByRole('button', { name: 'Remove member' }));
+
+    // The shared removal mutation only tracks its latest call — lock the other
+    // rows (and the role selects, which patch the same cached list) meanwhile.
+    expect(screen.getByRole('button', { name: 'Remove Tom Fischer' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Leave project' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Remove member' })).toBeDisabled();
+    const selects = screen.getAllByTestId('select');
+    expect(selects.map((el) => el.dataset.disabled)).toEqual(['true']);
+
+    resolveRemove();
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
   });
 
   it('shows a loading state while members are fetching', () => {
@@ -347,15 +487,21 @@ describe('Members', () => {
     expect(vi.mocked(getProjectMembers)).not.toHaveBeenCalled();
   });
 
-  it('resets local removals when the active project changes', async () => {
+  it('resets the search when the active project changes', async () => {
     const user = userEvent.setup();
     renderMembers();
-    await user.click(await screen.findByRole('button', { name: 'Remove Marcus Reid' }));
-    expect(screen.getByText('2 of 25 seats used on Flowboard Pro')).toBeInTheDocument();
+    await screen.findAllByTestId('avatar');
+    await user.type(screen.getByRole('searchbox', { name: 'Search people' }), 'contractor');
+    expect(screen.getAllByTestId('avatar')).toHaveLength(1);
 
     useStoreActiveProject.getState().setActiveProjectId('proj-2');
-    expect(await screen.findByText('3 of 25 seats used on Flowboard Pro')).toBeInTheDocument();
-    expect(screen.getAllByTestId('avatar')).toHaveLength(3); // Marcus is back
+    // Wait for the remounted body to load the new project's members (re-query
+    // each attempt — the pre-switch tree with the same seat line gets detached).
+    await waitFor(() => {
+      expect(screen.getAllByTestId('avatar')).toHaveLength(3);
+    });
+    expect(screen.getByText('3 of 25 seats used on Flowboard Pro')).toBeInTheDocument();
+    expect(screen.getByRole('searchbox', { name: 'Search people' })).toHaveValue('');
   });
 
   it('revokes a pending invite and shows the empty invites state', async () => {

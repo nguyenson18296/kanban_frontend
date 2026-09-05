@@ -1,18 +1,30 @@
 import { useId, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from '@tanstack/react-router';
 import { Mail, Plus, Search, UserPlus, X } from 'lucide-react';
 
 import { UserAvatar } from '@/components/UserAvatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useStoreActiveProject } from '@/stores/use-store-active-project';
+import { useStoreKanbanBoard } from '@/stores/use-store-kanban-board';
 import { useStoreUser } from '@/stores/use-store-user';
 import type { IProjectMember, ProjectRole } from '@/types';
 
 import { useGetProjectMembers } from '../hooks/use-get-project-members';
+import { useRemoveMember } from '../hooks/use-remove-member';
 import { useUpdateMemberRole } from '../hooks/use-update-member-role';
-import { ROLE_LABELS, assignableRoles, isProjectRole, normalizeProjectRole } from '../member-roles';
+import { ROLE_LABELS, assignableRoles, canRemoveMember, isProjectRole, normalizeProjectRole } from '../member-roles';
 
 import { IconTile } from '../components/icon-tile';
 import { SettingsPageHeader } from '../components/page-header';
@@ -33,10 +45,17 @@ const SEED_INVITES: readonly PendingInvite[] = [
   { id: 'inv-2', email: 'design@studio-nord.com', role: 'Guest', sent: 'Invited 6 days ago · reminder sent' },
 ];
 
+/** A removal waiting behind the confirm dialog — the member's row, plus whether it is a self-leave. */
+interface PendingRemoval {
+  userId: string;
+  displayName: string;
+  isSelf: boolean;
+}
+
 export default function Members() {
   // Remount the project-scoped body whenever the active project changes so the
-  // local state below (removals, search, seed invites) never bleeds from one
-  // project into another — reset by key, not a syncing effect.
+  // local state below (search, seed invites, pending confirm) never bleeds
+  // from one project into another — reset by key, not a syncing effect.
   const projectId = useStoreActiveProject((s) => s.activeProjectId);
   return <MembersForProject key={projectId ?? 'none'} projectId={projectId} />;
 }
@@ -47,6 +66,8 @@ interface MembersForProjectProps {
 
 function MembersForProject({ projectId }: MembersForProjectProps) {
   const currentUserId = useStoreUser((s) => s.user?.id);
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const resendHintId = useId();
   const { data: memberships, isLoading, isError, refetch } = useGetProjectMembers(projectId);
 
@@ -55,11 +76,10 @@ function MembersForProject({ projectId }: MembersForProjectProps) {
     isPending: isRoleSaving,
     variables: roleVariables,
   } = useUpdateMemberRole(projectId);
+  const { mutate: removeMember, isPending: isRemoving } = useRemoveMember(projectId);
 
   const [search, setSearch] = useState('');
-  // Removals are still local-only (no remove-member API wired yet); role
-  // changes are real — optimistic via the Query cache in useUpdateMemberRole.
-  const [removedIds, setRemovedIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [pendingRemoval, setPendingRemoval] = useState<PendingRemoval | null>(null);
   const [invites, setInvites] = useState<readonly PendingInvite[]>(SEED_INVITES);
   const [inviteOpen, setInviteOpen] = useState(false);
 
@@ -67,7 +87,7 @@ function MembersForProject({ projectId }: MembersForProjectProps) {
   const [domainJoin, setDomainJoin] = useState(false);
   const [guestsSeeAll, setGuestsSeeAll] = useState(true);
 
-  const members = (memberships ?? []).filter((member) => !removedIds.has(member.user.id));
+  const members = memberships ?? [];
   const query = search.trim().toLowerCase();
   const visibleMembers = query
     ? members.filter(
@@ -78,12 +98,38 @@ function MembersForProject({ projectId }: MembersForProjectProps) {
     : members;
 
   // The actor's own membership decides what they may edit — UX gating only;
-  // the backend re-checks every change (JAV-14).
+  // the backend re-checks every change (JAV-14 roles, JAV-15 removal).
   const actorMembership = (memberships ?? []).find((member) => member.user.id === currentUserId);
   const actorRole = actorMembership ? normalizeProjectRole(actorMembership.role) : null;
 
-  const removeMember = (id: string) =>
-    setRemovedIds((prev) => new Set(prev).add(id));
+  // Role changes and removals both patch the same cached list optimistically,
+  // and each shared useMutation only tracks its latest call — so one change of
+  // either kind in flight locks every row's controls.
+  const isMutating = isRoleSaving || isRemoving;
+
+  const confirmRemoval = () => {
+    if (!pendingRemoval) return;
+    const { userId, isSelf } = pendingRemoval;
+    removeMember(
+      { userId },
+      {
+        onSuccess: () => {
+          if (!isSelf) return;
+          // The caller just left the active project — mirror what the
+          // ProjectSwitcher does when leaving a project behind: drop its board
+          // copy, mark project-scoped data stale, and land somewhere the
+          // caller still has access to.
+          useStoreKanbanBoard.getState().clearKanbanBoard();
+          void queryClient.invalidateQueries({ queryKey: ['board'], refetchType: 'none' });
+          void queryClient.invalidateQueries({ queryKey: ['projects'] });
+          useStoreActiveProject.getState().setActiveProjectId(null);
+          void navigate({ to: '/dashboard' });
+        },
+        onSettled: () => setPendingRemoval(null),
+      },
+    );
+  };
+
   const revokeInvite = (id: string) =>
     setInvites((prev) => prev.filter((invite) => invite.id !== id));
   const addInvites = (next: readonly PendingInvite[]) =>
@@ -160,6 +206,14 @@ function MembersForProject({ projectId }: MembersForProjectProps) {
               {visibleMembers.map((member) => {
                 const role = normalizeProjectRole(member.role);
                 const isCurrentUser = member.user.id === currentUserId;
+                const displayName = member.user.full_name.trim() || 'Unknown user';
+                // JAV-15 removal gates: your own row is always leavable; other
+                // rows only when the actor's role outranks the target's needs.
+                const removal = !canRemoveMember(actorRole, role, isCurrentUser)
+                  ? null
+                  : isCurrentUser
+                    ? ('leave' as const)
+                    : ('remove' as const);
                 return (
                   <MemberRow
                     key={member.user.id}
@@ -168,9 +222,12 @@ function MembersForProject({ projectId }: MembersForProjectProps) {
                     roleOptions={assignableRoles(actorRole, role, isCurrentUser)}
                     isCurrentUser={isCurrentUser}
                     isSaving={isRoleSaving && roleVariables?.userId === member.user.id}
-                    isMutating={isRoleSaving}
+                    isMutating={isMutating}
+                    removal={removal}
                     onRoleChange={(next) => changeRole({ userId: member.user.id, role: next })}
-                    onRemove={() => removeMember(member.user.id)}
+                    onRemove={() =>
+                      setPendingRemoval({ userId: member.user.id, displayName, isSelf: isCurrentUser })
+                    }
                   />
                 );
               })}
@@ -264,6 +321,45 @@ function MembersForProject({ projectId }: MembersForProjectProps) {
         </SettingRows>
       </SettingsCard>
 
+      <Dialog
+        open={pendingRemoval !== null}
+        onOpenChange={(open) => {
+          if (!open && !isRemoving) setPendingRemoval(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>
+              {pendingRemoval?.isSelf ? 'Leave this project?' : `Remove ${pendingRemoval?.displayName}?`}
+            </DialogTitle>
+            <DialogDescription>
+              {pendingRemoval?.isSelf
+                ? "You'll lose access to this project's boards, tasks and teams. If you're its only owner, transfer ownership first."
+                : "They'll immediately lose access to this project and its teams."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isRemoving}
+              onClick={() => setPendingRemoval(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={isRemoving}
+              aria-busy={isRemoving}
+              onClick={confirmRemoval}
+            >
+              {pendingRemoval?.isSelf ? 'Leave this project' : 'Remove member'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <InviteDialog
         open={inviteOpen}
         onOpenChange={setInviteOpen}
@@ -284,17 +380,19 @@ interface MemberRowProps {
   /** This row's role change is the one in flight — drives `aria-busy`. */
   isSaving: boolean;
   /**
-   * ANY role change is in flight. Disables every role select: the shared
-   * useMutation only tracks its latest call, so allowing a second change
-   * mid-flight would re-enable the first row early and let overlapping
-   * optimistic snapshots clobber each other on revert.
+   * ANY member mutation (role change or removal) is in flight. Disables every
+   * row control: the shared useMutations only track their latest call, and
+   * both patch the same cached list optimistically, so overlapping changes
+   * would clobber each other's snapshots on revert.
    */
   isMutating: boolean;
+  /** Which removal control this row gets — self-leave, remove, or none. */
+  removal: 'leave' | 'remove' | null;
   onRoleChange: (role: ProjectRole) => void;
   onRemove: () => void;
 }
 
-function MemberRow({ user, role, roleOptions, isCurrentUser, isSaving, isMutating, onRoleChange, onRemove }: MemberRowProps) {
+function MemberRow({ user, role, roleOptions, isCurrentUser, isSaving, isMutating, removal, onRoleChange, onRemove }: MemberRowProps) {
   const displayName = user.full_name.trim() || 'Unknown user';
   const canEditRole = roleOptions.length > 0;
   return (
@@ -338,17 +436,33 @@ function MemberRow({ user, role, roleOptions, isCurrentUser, isSaving, isMutatin
         ) : (
           <span className="w-[110px] px-3 text-sm text-muted-foreground">{ROLE_LABELS[role]}</span>
         )}
-        <Button
-          type="button"
-          variant="outline"
-          size="icon-sm"
-          aria-label={`Remove ${displayName}`}
-          disabled={isCurrentUser}
-          className="text-muted-foreground hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
-          onClick={onRemove}
-        >
-          <X aria-hidden="true" />
-        </Button>
+        {removal === 'leave' ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={isMutating}
+            className="text-muted-foreground hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
+            onClick={onRemove}
+          >
+            Leave project
+          </Button>
+        ) : removal === 'remove' ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-sm"
+            aria-label={`Remove ${displayName}`}
+            disabled={isMutating}
+            className="text-muted-foreground hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
+            onClick={onRemove}
+          >
+            <X aria-hidden="true" />
+          </Button>
+        ) : (
+          // Keep the trailing column aligned on rows the actor may not remove.
+          <span aria-hidden="true" className="size-8" />
+        )}
       </div>
     </li>
   );
