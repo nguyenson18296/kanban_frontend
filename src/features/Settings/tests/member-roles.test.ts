@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { assignableRoles, normalizeProjectRole } from '../member-roles';
+import { assignableRoles, canRemoveMember, normalizeProjectRole } from '../member-roles';
 
 describe('normalizeProjectRole', () => {
   it('maps known roles case-insensitively', () => {
@@ -39,5 +39,36 @@ describe('assignableRoles', () => {
     expect(assignableRoles('member', 'viewer', false)).toEqual([]);
     expect(assignableRoles('viewer', 'member', false)).toEqual([]);
     expect(assignableRoles(null, 'member', false)).toEqual([]);
+  });
+});
+
+describe('canRemoveMember', () => {
+  it('lets anyone remove themselves (self-leave), whatever their role', () => {
+    expect(canRemoveMember('viewer', 'viewer', true)).toBe(true);
+    expect(canRemoveMember('member', 'member', true)).toBe(true);
+    expect(canRemoveMember('admin', 'admin', true)).toBe(true);
+    expect(canRemoveMember('owner', 'owner', true)).toBe(true);
+  });
+
+  it('lets an admin remove members and viewers only', () => {
+    expect(canRemoveMember('admin', 'member', false)).toBe(true);
+    expect(canRemoveMember('admin', 'viewer', false)).toBe(true);
+    expect(canRemoveMember('admin', 'admin', false)).toBe(false);
+    expect(canRemoveMember('admin', 'owner', false)).toBe(false);
+  });
+
+  it('lets an owner remove anyone, admins and owners included', () => {
+    expect(canRemoveMember('owner', 'member', false)).toBe(true);
+    expect(canRemoveMember('owner', 'viewer', false)).toBe(true);
+    expect(canRemoveMember('owner', 'admin', false)).toBe(true);
+    expect(canRemoveMember('owner', 'owner', false)).toBe(true);
+  });
+
+  it('gives members, viewers and non-members no removal rights over others', () => {
+    expect(canRemoveMember('member', 'member', false)).toBe(false);
+    expect(canRemoveMember('member', 'viewer', false)).toBe(false);
+    expect(canRemoveMember('viewer', 'viewer', false)).toBe(false);
+    expect(canRemoveMember(null, 'member', false)).toBe(false);
+    expect(canRemoveMember(null, 'member', true)).toBe(false);
   });
 });
