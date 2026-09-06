@@ -33,4 +33,11 @@ interface IProjectMembersResponse {
   success: boolean;
 }
 
-export type { IProject, IProjectMember, IProjectMembersResponse, ProjectRole };
+/** Envelope returned by `GET /users/me/projects` — the caller's own projects. */
+interface IMyProjectsResponse {
+  data: IProject[];
+  status: number;
+  success: boolean;
+}
+
+export type { IProject, IProjectMember, IProjectMembersResponse, IMyProjectsResponse, ProjectRole };

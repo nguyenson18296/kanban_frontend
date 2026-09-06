@@ -61,6 +61,11 @@ const TWO_PROJECTS = [
   makeProject({ id: "p2", name: "Design System", tag: "DS" }),
 ];
 
+/** `GET /users/me/projects` list envelope, as returned by the backend. */
+function myProjects(data: IProject[]) {
+  return { data, status: 200, success: true };
+}
+
 function renderSwitcher() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -87,7 +92,7 @@ afterEach(() => {
 
 describe("ProjectSwitcher", () => {
   it("shows the stored active project in the trigger", async () => {
-    mocked.getProjects.mockResolvedValue(TWO_PROJECTS);
+    mocked.getMyProjects.mockResolvedValue(myProjects(TWO_PROJECTS));
     useStoreActiveProject.setState({ activeProjectId: "p2" });
     renderSwitcher();
 
@@ -97,7 +102,7 @@ describe("ProjectSwitcher", () => {
   });
 
   it("falls back to the first project when nothing is stored", async () => {
-    mocked.getProjects.mockResolvedValue(TWO_PROJECTS);
+    mocked.getMyProjects.mockResolvedValue(myProjects(TWO_PROJECTS));
     renderSwitcher();
 
     expect(
@@ -106,7 +111,7 @@ describe("ProjectSwitcher", () => {
   });
 
   it("lists every project and marks only the active one as current", async () => {
-    mocked.getProjects.mockResolvedValue(TWO_PROJECTS);
+    mocked.getMyProjects.mockResolvedValue(myProjects(TWO_PROJECTS));
     useStoreActiveProject.setState({ activeProjectId: "p1" });
     renderSwitcher();
 
@@ -120,7 +125,7 @@ describe("ProjectSwitcher", () => {
   });
 
   it("switching from a project-agnostic page updates the context without navigating", async () => {
-    mocked.getProjects.mockResolvedValue(TWO_PROJECTS);
+    mocked.getMyProjects.mockResolvedValue(myProjects(TWO_PROJECTS));
     useStoreActiveProject.setState({ activeProjectId: "p1" });
     useStoreKanbanBoard.setState({ kanbanBoard: { columns: [] } });
     const user = userEvent.setup();
@@ -139,7 +144,7 @@ describe("ProjectSwitcher", () => {
 
   it("switching from a project route navigates to the new project's board", async () => {
     pathname = "/projects/p1/tasks/t42";
-    mocked.getProjects.mockResolvedValue(TWO_PROJECTS);
+    mocked.getMyProjects.mockResolvedValue(myProjects(TWO_PROJECTS));
     useStoreActiveProject.setState({ activeProjectId: "p1" });
     const user = userEvent.setup();
     renderSwitcher();
@@ -155,7 +160,7 @@ describe("ProjectSwitcher", () => {
 
   it("selecting the current project is a no-op", async () => {
     pathname = "/projects/p1";
-    mocked.getProjects.mockResolvedValue(TWO_PROJECTS);
+    mocked.getMyProjects.mockResolvedValue(myProjects(TWO_PROJECTS));
     useStoreActiveProject.setState({ activeProjectId: "p1" });
     useStoreKanbanBoard.setState({ kanbanBoard: { columns: [] } });
     const user = userEvent.setup();
@@ -170,7 +175,7 @@ describe("ProjectSwitcher", () => {
   });
 
   it("repairs a stale stored id when selecting the shown fallback project", async () => {
-    mocked.getProjects.mockResolvedValue(TWO_PROJECTS);
+    mocked.getMyProjects.mockResolvedValue(myProjects(TWO_PROJECTS));
     useStoreActiveProject.setState({ activeProjectId: "deleted-id" });
     const user = userEvent.setup();
     renderSwitcher();
@@ -185,28 +190,35 @@ describe("ProjectSwitcher", () => {
   });
 
   it("shows a loading placeholder while projects load", () => {
-    mocked.getProjects.mockReturnValue(new Promise(() => {}));
+    mocked.getMyProjects.mockReturnValue(new Promise(() => {}));
     renderSwitcher();
 
     expect(screen.getByRole("status", { name: "Loading projects" })).toBeInTheDocument();
   });
 
   it("shows the empty state when the user has no projects", async () => {
-    mocked.getProjects.mockResolvedValue([]);
+    mocked.getMyProjects.mockResolvedValue(myProjects([]));
     renderSwitcher();
 
     expect(await screen.findByText("No projects yet.")).toBeInTheDocument();
   });
 
   it("shows the error state when projects fail to load", async () => {
-    mocked.getProjects.mockRejectedValue(new Error("boom"));
+    mocked.getMyProjects.mockRejectedValue(new Error("boom"));
+    renderSwitcher();
+
+    expect(await screen.findByText("Couldn't load projects.")).toBeInTheDocument();
+  });
+
+  it("shows the error state on a success: false envelope", async () => {
+    mocked.getMyProjects.mockResolvedValue({ data: [], status: 200, success: false });
     renderSwitcher();
 
     expect(await screen.findByText("Couldn't load projects.")).toBeInTheDocument();
   });
 
   it("still renders a working switcher when the user has a single project", async () => {
-    mocked.getProjects.mockResolvedValue([makeProject()]);
+    mocked.getMyProjects.mockResolvedValue(myProjects([makeProject()]));
     renderSwitcher();
 
     expect(
@@ -223,7 +235,7 @@ describe("ProjectSwitcher", () => {
     const many = Array.from({ length: 8 }, (_, i) =>
       makeProject({ id: `p${i + 1}`, name: `Project ${i + 1}`, tag: `T${i + 1}` }),
     );
-    mocked.getProjects.mockResolvedValue(many);
+    mocked.getMyProjects.mockResolvedValue(myProjects(many));
     const user = userEvent.setup();
     renderSwitcher();
 

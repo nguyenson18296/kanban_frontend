@@ -1,8 +1,8 @@
 import { httpClient } from "@/lib/http-client";
-import type { IProject, IProjectMember, IProjectMembersResponse, ProjectRole } from "@/types";
+import type { IMyProjectsResponse, IProjectMember, IProjectMembersResponse, ProjectRole } from "@/types";
 
-export const getProjects = (signal?: AbortSignal) => {
-  return httpClient.get<IProject[]>("/projects", signal);
+export const getMyProjects = (signal?: AbortSignal) => {
+  return httpClient.get<IMyProjectsResponse>("/users/me/projects", signal);
 };
 
 export const getProjectMembers = (projectId: string, signal?: AbortSignal) => {
