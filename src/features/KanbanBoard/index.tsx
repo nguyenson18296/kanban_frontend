@@ -1,22 +1,55 @@
 import { DragDropProvider } from "@dnd-kit/react";
 import { move } from "@dnd-kit/helpers";
-import { useParams } from "@tanstack/react-router";
+import { Link, useParams } from "@tanstack/react-router";
 
 import Column from "./column";
 import { useState } from "react";
 import type { ITask } from "../../types";
 
 import { useGetBoard } from "./hooks/use-get-board";
+import { useBoardRoom } from "./hooks/use-board-room";
 import { useMoveTaskToColumn } from "./hooks/use-move-task-to-column";
 import { useReorderTask } from "./hooks/use-reorder-task";
 import { useStoreKanbanBoard } from "@/stores/use-store-kanban-board";
+import { HttpError } from "@/lib/http-client";
 
 export default function KanbanBoard() {
   const { projectId } = useParams({ from: "/_authenticated/projects/$projectId/" });
-  const { isLoading } = useGetBoard(projectId);
+  const { isLoading, error, refetch } = useGetBoard(projectId);
+  const boardRoom = useBoardRoom(projectId);
   const kanbanBoard = useStoreKanbanBoard((state) => state.kanbanBoard);
+
+  // The server deliberately gives one masked answer for "no access" and "does
+  // not exist" on both channels (HTTP 404 and WS board:join:error) — render
+  // the same not-found state for either, and never retry in a loop (JAV-32).
+  // role="status" announces the swap when a live board loses access mid-session.
+  if (boardRoom === "denied" || (error instanceof HttpError && error.status === 404)) {
+    return (
+      <div role="status" className="p-8 text-sm text-muted-foreground">
+        <p>Project not found. It may have been deleted, or you may not have access.</p>
+        <Link to="/dashboard" className="mt-2 inline-block underline">
+          Back to dashboard
+        </Link>
+      </div>
+    );
+  }
+
+  // Non-404 failure with nothing cached to show: say what happened and offer a
+  // retry. (A background-refetch failure with a board already in the store
+  // still renders the board.)
+  if (error && !kanbanBoard) {
+    return (
+      <div role="alert" className="p-8 text-sm text-destructive">
+        Failed to load the board.{" "}
+        <button type="button" className="cursor-pointer underline" onClick={() => void refetch()}>
+          Try again
+        </button>
+      </div>
+    );
+  }
+
   if (isLoading || !kanbanBoard) {
-    return <div className="p-8 text-sm text-[#64748b]">Loading board...</div>;
+    return <div className="p-8 text-sm text-muted-foreground">Loading board...</div>;
   }
 
   return <Board board={kanbanBoard} />;

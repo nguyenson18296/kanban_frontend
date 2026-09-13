@@ -12,9 +12,10 @@ import {
 
 import {
   SocketManager,
+  type BoardRoomStatus,
   type ConnectionStatus,
   type WsNotification,
-} from '../services/socket-manager'
+} from '@/services/socket-manager'
 import { getCookie } from '@/lib/cookie'
 import { tryRefreshTokens } from '@/lib/http-client'
 import { queryClient } from '@/lib/query-client'
@@ -175,15 +176,28 @@ function showNotificationToast({ notification, onNavigate, currentPath }: Notifi
   )
 }
 
+interface BoardRoomSnapshot {
+  projectId: string
+  status: BoardRoomStatus
+}
+
 interface WebSocketContextValue {
   status: ConnectionStatus
+  // The board room this client currently wants/holds (one board open at a time).
+  boardRoom: BoardRoomSnapshot | null
+  joinBoardRoom: (projectId: string) => void
+  leaveBoardRoom: (projectId: string) => void
 }
 
 const WebSocketContext = createContext<WebSocketContextValue | null>(null)
 
 export function WebSocketProvider({ children }: Readonly<{ children: ReactNode }>) {
   const [status, setStatus] = useState<ConnectionStatus>('disconnected')
+  const [boardRoom, setBoardRoom] = useState<BoardRoomSnapshot | null>(null)
   const managerRef = useRef<SocketManager | null>(null)
+  // A board view's effect runs before this provider's own effect has created
+  // the manager — remember the requested room and join once it exists.
+  const desiredBoardRoomRef = useRef<string | null>(null)
   const router = useRouter()
   const routerRef = useRef(router)
   useEffect(() => {
@@ -220,10 +234,15 @@ export function WebSocketProvider({ children }: Readonly<{ children: ReactNode }
       onStatusChange: setStatus,
       onConnect: scheduleRefetchVisiblePresence,
       onPresenceUpdate: applyPresenceUpdate,
+      onBoardRoomStatus: (projectId, roomStatus) =>
+        setBoardRoom({ projectId, status: roomStatus }),
     })
 
     managerRef.current = manager
     manager.connect()
+    if (desiredBoardRoomRef.current) {
+      manager.joinBoardRoom(desiredBoardRoomRef.current)
+    }
 
     return () => {
       manager.disconnect()
@@ -232,8 +251,28 @@ export function WebSocketProvider({ children }: Readonly<{ children: ReactNode }
     }
   }, [])
 
+  // Identity is load-bearing: useBoardRoom's effect cleanup keys off these
+  // references — an unstable identity would leave/re-join on every provider
+  // re-render (a board:join/board:leave loop the contract forbids, §5).
+  // useState's initializer guarantees stability without relying on compiler
+  // memoization; everything captured (refs, setBoardRoom) is itself stable.
+  const [roomApi] = useState(() => ({
+    joinBoardRoom(projectId: string) {
+      desiredBoardRoomRef.current = projectId
+      managerRef.current?.joinBoardRoom(projectId)
+    },
+    leaveBoardRoom(projectId: string) {
+      if (desiredBoardRoomRef.current === projectId) {
+        desiredBoardRoomRef.current = null
+      }
+      managerRef.current?.leaveBoardRoom(projectId)
+      // Drop a stale snapshot so the next board never sees the previous room's state.
+      setBoardRoom((current) => (current?.projectId === projectId ? null : current))
+    },
+  }))
+
   return (
-    <WebSocketContext.Provider value={{ status }}>
+    <WebSocketContext.Provider value={{ status, boardRoom, ...roomApi }}>
       {children}
     </WebSocketContext.Provider>
   )
