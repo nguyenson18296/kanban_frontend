@@ -30,11 +30,14 @@ const TAG_COLORS: Record<string, string> = {
 interface TaskProps extends ITask {
   index: number;
   columnId: number;
+  /** Board search "reveal" briefly outlines the card (JAV-35). */
+  isFlashing?: boolean;
 }
 
 export default function Task({
   index,
   columnId,
+  isFlashing = false,
   ...task
 }: Readonly<TaskProps>) {
   const { id, title, labels, priority, assignees, due_date } = task;
@@ -94,8 +97,11 @@ export default function Task({
         ref={ref}
         role="button"
         tabIndex={0}
+        data-task-id={id}
+        data-flashing={isFlashing}
         className={cn(
           "mb-3 cursor-grab rounded-xl border bg-white p-4 shadow-sm transition-all hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6366f1]",
+          "data-[flashing=true]:ring-2 data-[flashing=true]:ring-primary data-[flashing=true]:ring-offset-2 data-[flashing=true]:shadow-lg",
           isDragging
             ? "rotate-3 scale-105 border-[#6366f1] shadow-lg ring-2 ring-[#6366f1]/20"
             : "border-[#e8ecf1]",
