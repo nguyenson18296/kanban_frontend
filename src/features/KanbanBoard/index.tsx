@@ -3,8 +3,10 @@ import { move } from "@dnd-kit/helpers";
 import { Link, useParams } from "@tanstack/react-router";
 
 import Column from "./column";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ITask } from "../../types";
+
+import BoardSearch from "./board-search";
 
 import { useGetBoard } from "./hooks/use-get-board";
 import { useBoardRoom } from "./hooks/use-board-room";
@@ -13,11 +15,45 @@ import { useReorderTask } from "./hooks/use-reorder-task";
 import { useStoreKanbanBoard } from "@/stores/use-store-kanban-board";
 import { HttpError } from "@/lib/http-client";
 
+// How long a revealed card keeps its outline (JAV-35).
+const FLASH_DURATION_MS = 2000;
+
 export default function KanbanBoard() {
   const { projectId } = useParams({ from: "/_authenticated/projects/$projectId/" });
   const { isLoading, error, refetch } = useGetBoard(projectId);
   const boardRoom = useBoardRoom(projectId);
   const kanbanBoard = useStoreKanbanBoard((state) => state.kanbanBoard);
+
+  // "Reveal on board" from search: scroll the card into view and outline it briefly.
+  const [flashTaskId, setFlashTaskId] = useState<string | null>(null);
+  const flashTimerRef = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (flashTimerRef.current !== null) window.clearTimeout(flashTimerRef.current);
+    },
+    [],
+  );
+
+  const handleReveal = (taskId: string) => {
+    if (flashTimerRef.current !== null) window.clearTimeout(flashTimerRef.current);
+    setFlashTaskId(taskId);
+    flashTimerRef.current = window.setTimeout(() => {
+      setFlashTaskId(null);
+      flashTimerRef.current = null;
+    }, FLASH_DURATION_MS);
+
+    // The board stays mounted behind the dialog, so the card is queryable
+    // right away (the dialog itself closes on this same interaction).
+    const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+    // CSS.escape keeps unusual ids (quotes, brackets) from breaking the selector.
+    const selectorId =
+      typeof CSS !== "undefined" && typeof CSS.escape === "function" ? CSS.escape(taskId) : taskId;
+    document.querySelector(`[data-task-id="${selectorId}"]`)?.scrollIntoView({
+      behavior: reduceMotion ? "auto" : "smooth",
+      block: "center",
+      inline: "center",
+    });
+  };
 
   // The server deliberately gives one masked answer for "no access" and "does
   // not exist" on both channels (HTTP 404 and WS board:join:error) — render
@@ -52,10 +88,23 @@ export default function KanbanBoard() {
     return <div className="p-8 text-sm text-muted-foreground">Loading board...</div>;
   }
 
-  return <Board board={kanbanBoard} />;
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center">
+        <BoardSearch projectId={projectId} onReveal={handleReveal} />
+      </div>
+      <Board board={kanbanBoard} flashTaskId={flashTaskId} />
+    </div>
+  );
 }
 
-function Board({ board }: Readonly<{ board: NonNullable<ReturnType<typeof useGetBoard>['data']> }>) {
+function Board({
+  board,
+  flashTaskId,
+}: Readonly<{
+  board: NonNullable<ReturnType<typeof useGetBoard>['data']>;
+  flashTaskId: string | null;
+}>) {
   const columns = board.columns;
   const sortedColumns = [...columns].sort((a, b) => a.position - b.position);
 
@@ -162,6 +211,7 @@ function Board({ board }: Readonly<{ board: NonNullable<ReturnType<typeof useGet
               tasks={effectiveItems[String(column.id)] ?? []}
               index={columnIndex}
               isDropTarget={dropTargetColumn === String(column.id)}
+              flashTaskId={flashTaskId}
             />
           );
         })}
