@@ -1,6 +1,7 @@
 import { useParams } from "@tanstack/react-router";
 
 import { useGetTaskByTicketId } from "./hooks/use-get-task-by-ticket-id";
+import { useRecordRecentTask } from "./hooks/use-record-recent-task";
 import { useGetBoard } from "@/features/KanbanBoard/hooks/use-get-board";
 import { useUpdateTask } from "@/features/KanbanBoard/hooks/use-update-task";
 import { useUpdateAssignees } from "@/components/AssigneeDropdown/hooks/use-update-assignees";
@@ -26,6 +27,8 @@ export default function TaskDetail() {
 
   useGetBoard(projectId);
   const { data: task, isLoading, isError } = useGetTaskByTicketId(ticketId);
+  // Feed board search's "Recently opened" list (JAV-35).
+  useRecordRecentTask(projectId, task?.ticket_id);
   const addOptimisticActivity = useStoreOptimisticActivities((s) => s.addActivity);
 
   const { mutate: updateTaskMutation } = useUpdateTask();

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Kanban board application: a **client-only single-page app** built with React 19, TypeScript, and Vite 7. Features are implemented (boards, columns, drag-and-drop tasks, task detail, subtasks, comments, activity feed, notifications, auth, real-time updates, task subscriptions).
+Kanban board application: a **client-only single-page app** built with React 19, TypeScript, and Vite 7. Features are implemented (boards, columns, drag-and-drop tasks, board search, task detail, subtasks, comments, activity feed, notifications, auth, real-time updates, task subscriptions).
 
 **There is NO backend in this repo, NO Next.js, NO SSR, and NO React Server Components.** Everything ships to the browser. Ignore any guidance (including from the skills below) about RSC / server actions / server components / streaming SSR / Next.js routing or metadata — none of it applies.
 
@@ -65,6 +65,8 @@ Path alias `@/` → `./src` (declared in `vite.config.ts`, `tsconfig.app.json`, 
 
 Components never call services directly and never call `fetch` directly.
 
+**Board search (JAV-35)** is fully client-side: `features/KanbanBoard/search.ts` (pure scoring/highlight/excerpt module) runs over the board already in the Zustand store — there is no search endpoint. `board-search.tsx` owns the Cmd/Ctrl+F overlay (Shift+mod+F falls through to native find); "Reveal" scrolls via `[data-task-id]` + a `data-flashing` outline on the card, and `stores/use-store-recent-tasks.ts` (persisted) feeds the "Recently opened" idle view, recorded by `TaskDetail`'s `use-record-recent-task.ts`.
+
 ## Adding something — quick map
 
 - **New component** → `components/<Dir>/index.tsx` (shared) or inside the owning `features/<Feature>/`.
@@ -97,7 +99,7 @@ See **react-patterns** for the general composition reasoning; repo specifics:
 - Extract a shared abstraction once a pattern is used in **3+ places** — don't pre-abstract a single use.
 
 ### State (Zustand)
-- Stores live in `stores/use-store-<domain>.ts`, export `useStore<Domain>` from `create<T>((set) => …)`, with the state+actions interface as the generic. The `persist` middleware is used **only** for state that must survive reload (the user store; the preferences store; the active-project store backing the sidebar ProjectSwitcher — the latter two versioned `{ name, version }` and holding no PII/tokens). Theme is applied by `startThemeSync()` (`use-store-preferences.ts`, called once in `main.tsx`) toggling the `.dark` class; preferences pages read it via atomic selectors.
+- Stores live in `stores/use-store-<domain>.ts`, export `useStore<Domain>` from `create<T>((set) => …)`, with the state+actions interface as the generic. The `persist` middleware is used **only** for state that must survive reload (the user store; the preferences store; the active-project store backing the sidebar ProjectSwitcher; the recent-tasks store feeding board search's "Recently opened" list — all but the user store versioned `{ name, version }` and holding no PII/tokens). Theme is applied by `startThemeSync()` (`use-store-preferences.ts`, called once in `main.tsx`) toggling the `.dark` class; preferences pages read it via atomic selectors.
 - **Subscribe with atomic selectors** — `useStore((s) => s.field)`, one value per selector — never destructure the whole store (that re-renders on any change; the compiler does not memoize Zustand subscriptions). Prefer selecting a **derived boolean** (`(s) => s.items.length > 0`) over selecting the raw value and deriving in the body. For object/array selectors use `useShallow`, or return a **module-level stable empty constant** as the fallback to avoid infinite re-render loops.
 - Outside render (event callbacks, effect cleanup, non-hook helpers) read stores imperatively via `useStore.getState()`.
 

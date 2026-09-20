@@ -14,9 +14,11 @@ interface ColumnProps {
   tasks: ITask[];
   index: number;
   isDropTarget: boolean;
+  /** Task currently being revealed by board search, if any (JAV-35). */
+  flashTaskId: string | null;
 }
 
-export default function Column({ id, title, color, tasks, index, isDropTarget }: Readonly<ColumnProps>) {
+export default function Column({ id, title, color, tasks, index, isDropTarget, flashTaskId }: Readonly<ColumnProps>) {
   const { ref } = useSortable({
     id: String(id),
     index,
@@ -58,7 +60,13 @@ export default function Column({ id, title, color, tasks, index, isDropTarget }:
         ref={ref}
       >
         {tasks.map((task, taskIndex) => (
-          <Task key={task.id} index={taskIndex} columnId={id} {...task} />
+          <Task
+            key={task.id}
+            index={taskIndex}
+            columnId={id}
+            isFlashing={task.id === flashTaskId}
+            {...task}
+          />
         ))}
       </div>
 
