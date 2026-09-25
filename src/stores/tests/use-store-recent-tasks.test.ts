@@ -67,12 +67,14 @@ describe("useStoreRecentTasks", () => {
     expect(useStoreRecentTasks.getState().recentByProject).toEqual({ p2: ["KAN-9"] });
   });
 
-  it("clearing a project with no recents is a no-op", () => {
+  it("clearing a project with no recents is a no-op that keeps the same map reference", () => {
     useStoreRecentTasks.getState().recordRecentTask("p2", "KAN-9");
+    const before = useStoreRecentTasks.getState().recentByProject;
 
     useStoreRecentTasks.getState().clearRecentTasks("p1");
 
-    expect(useStoreRecentTasks.getState().recentByProject).toEqual({ p2: ["KAN-9"] });
+    // Same reference — no subscriber re-render, no persist write.
+    expect(useStoreRecentTasks.getState().recentByProject).toBe(before);
   });
 
   it("migrates v1 payloads by keeping their shape", async () => {

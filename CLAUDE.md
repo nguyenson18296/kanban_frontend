@@ -20,7 +20,7 @@ Package manager is **pnpm** (pinned `pnpm@10.15.1`). Husky git hooks run **`pnpm
 
 ## Project Skills
 
-Seven project-local skills live in `.claude/skills/`. Reach for the relevant one instead of re-deriving generic guidance — but the repo-specific rules in this file win wherever they conflict, and this is a client-only Vite SPA so every skill's Next.js/RSC/SSR content is not applicable.
+Eight project-local skills live in `.claude/skills/`. Reach for the relevant one instead of re-deriving generic guidance — but the repo-specific rules in this file win wherever they conflict, and this is a client-only Vite SPA so every skill's Next.js/RSC/SSR content is not applicable.
 
 - **react-patterns** — generic client-side React reasoning (hooks discipline, derive-don't-store, composition-over-flags, state-location decision tree, client Suspense + error-boundary placement, stable list keys / virtualization). *Relevance-limited:* skip its Server/Client-Component, `'use client'`/`'use server'`, and server-fetch sections; React 19 client form actions work in a SPA but this repo standardizes on RHF+Zod (see below); the React Compiler makes its "default to no memoization" a hard rule here.
 - **react-performance** — the full ~70-rule perf catalog. *Relevance-limited:* ignore its Server-Component/API-route and Next.js-specific rules (`next/dynamic`, `next/image`, `React.cache`, hydration), but the parallelize-independent-awaits kernel from the Waterfalls category still applies client-side (don't chain sequential `await`s in a `queryFn`/service, don't serialize dependent `useQuery`s that could run in parallel). Its manual-memo category is review-only because the React Compiler is on.
@@ -29,6 +29,7 @@ Seven project-local skills live in `.claude/skills/`. Reach for the relevant one
 - **vite-patterns** — Vite config/env/proxy/build-splitting. *Version-skewed:* the skill targets Vite 8/Rolldown/SWC; this repo is Vite 7/Rollup configured with the Babel `@vitejs/plugin-react` running `babel-plugin-react-compiler`. Keep that setup — don't swap to `plugin-react-swc` and rewire the compiler for no reason. Its library-mode and SSR-externals sections don't apply.
 - **frontend-patterns** — generic; prefer the more specific skills above and this file, which override it (its memoization / hand-rolled-`useQuery` / Context+reducer / controlled-form examples conflict with this repo's Compiler / TanStack Query / Zustand / RHF+Zod conventions).
 - **ticket-review** — entry point for "review my branch/PR against the ticket." Note: this repo's tickets are `KAN-<n>` (e.g. `feat/KAN-78`), **not** `PRODUCT-*`, and there is **no** `Code Review Prompt.md` at the repo root — ignore those parts of the skill.
+- **feature-docs** — entry point for "document this feature / write docs for `<ticket>`." Emits a concise 6-section doc to `docs/<TICKET>-<slug>.md`; the older long-form deep-dives in `docs/` are legacy format, not the template.
 ## Tech Stack
 
 - **React 19** with the **React Compiler** enabled (`babel-plugin-react-compiler` via `@vitejs/plugin-react`) — automatic memoization

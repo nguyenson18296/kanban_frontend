@@ -32,12 +32,16 @@ export function useSearchTasks(query: string) {
       // Results can drift between page fetches (tasks edited/created), letting
       // one hit land on two pages — keep the first occurrence so React keys
       // stay unique.
+      // Track IDs already encountered so duplicate tasks can be skipped.
       const seen = new Set<string>();
+      // Store the full, deduplicated task objects returned to the UI.
       const hits: ITaskSearchHit[] = [];
       for (const page of data.pages) {
         for (const hit of page.data) {
           if (!seen.has(hit.id)) {
+            // Track IDs already encountered so duplicate tasks can be skipped.
             seen.add(hit.id);
+             // Store the full, deduplicated task objects returned to the UI.
             hits.push(hit);
           }
         }

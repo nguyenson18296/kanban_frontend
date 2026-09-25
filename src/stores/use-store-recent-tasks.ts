@@ -39,11 +39,14 @@ export const useStoreRecentTasks = create<IStoreRecentTasks>()(
           return { recentByProject: { ...Object.fromEntries(kept), [projectId]: next } };
         }),
       clearRecentTasks: (projectId) =>
-        set((state) => ({
-          recentByProject: Object.fromEntries(
-            Object.entries(state.recentByProject).filter(([key]) => key !== projectId),
-          ),
-        })),
+        set((state) => {
+          // Nothing to clear — return the same state so subscribers and the
+          // persist middleware see no change.
+          if (!(projectId in state.recentByProject)) return state;
+          const rest = { ...state.recentByProject };
+          delete rest[projectId];
+          return { recentByProject: rest };
+        }),
     }),
     {
       name: 'recent-tasks-store',

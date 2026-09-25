@@ -165,7 +165,7 @@ describe("BoardSearch all-projects scope", () => {
     expect(mark).toHaveTextContent("login");
   });
 
-  it("sanitizes server snippets before rendering them as HTML", async () => {
+  it("renders snippet markup as inert text segments — hostile HTML never becomes elements", async () => {
     vi.mocked(searchTasksAllProjects).mockResolvedValue(
       makePage([
         makeHit({
