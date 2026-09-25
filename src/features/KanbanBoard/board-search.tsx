@@ -12,15 +12,20 @@ import {
 
 import AvatarGroup from "@/components/AvatarGroup";
 import Kbd from "@/components/Kbd";
+import { useGetProjects } from "@/components/ProjectSwitcher/hooks/use-get-projects";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { useDebounce } from "@/hooks/use-debounce";
 import { cn } from "@/lib/utils";
 import { useStoreKanbanBoard } from "@/stores/use-store-kanban-board";
 import { useStoreRecentTasks } from "@/stores/use-store-recent-tasks";
-import type { IBoard, IColumn, ITask, Priority } from "@/types";
+import type { IBoard, IColumn, ITask, ITaskSearchHit, Priority } from "@/types";
 
-import { isDoneColumn, searchPhase, searchTasks, segments, snippet } from "./search";
+import { useSearchTasks } from "./hooks/use-search-tasks";
+import { isDoneColumn, searchPhase, searchTasks, segments, serverSearchPhase, snippet } from "./search";
 import type { ISearchResult, ISegment, SearchPhase } from "./search";
+import SearchHitRow from "./search-hit-row";
 
 const LISTBOX_ID = "board-search-listbox";
 const optionId = (index: number) => `board-search-option-${index}`;
@@ -39,6 +44,11 @@ const isMac =
 const SHORTCUT_LABEL = isMac ? "⌘F" : "Ctrl F";
 
 const NO_RECENTS: string[] = [];
+const NO_HITS: ITaskSearchHit[] = [];
+
+type SearchScope = "board" | "all";
+
+const SEARCH_DEBOUNCE_MS = 250;
 
 /**
  * `attempt` exists so "Try again" forces a re-run: the React Compiler keys the
@@ -176,8 +186,9 @@ interface BoardSearchProps {
 }
 
 /**
- * Board search (JAV-35): Cmd/Ctrl+F opens an overlay that fuzzy-searches every
- * card on the current board — fully client-side over the board store.
+ * Task search overlay (Cmd/Ctrl+F), two scopes: "This board" (JAV-35) searches
+ * the board store client-side; "All projects" (JSP-38) searches the server
+ * across the user's memberships — a hit navigates to its own board.
  */
 export default function BoardSearch({ projectId, onReveal }: Readonly<BoardSearchProps>) {
   const router = useRouter();
@@ -187,6 +198,7 @@ export default function BoardSearch({ projectId, onReveal }: Readonly<BoardSearc
   );
 
   const [open, setOpen] = useState(false);
+  const [scope, setScope] = useState<SearchScope>("board");
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const [searchAttempt, setSearchAttempt] = useState(0);
@@ -198,9 +210,17 @@ export default function BoardSearch({ projectId, onReveal }: Readonly<BoardSearc
   const trimmed = query.trim();
   const deferredTrimmed = deferredQuery.trim();
 
+  const debouncedQuery = useDebounce(trimmed, SEARCH_DEBOUNCE_MS);
+  const allSearch = useSearchTasks(open && scope === "all" ? debouncedQuery : "");
+  const projectsQuery = useGetProjects();
+  const hits = scope === "all" ? (allSearch.data?.hits ?? NO_HITS) : NO_HITS;
+  const projectNameById = new Map(
+    (projectsQuery.data ?? []).map((project) => [project.id, project.name]),
+  );
+
   let results: ISearchResult[] = [];
   let searchFailed = false;
-  if (open && deferredTrimmed) {
+  if (open && scope === "board" && deferredTrimmed) {
     try {
       results = runBoardSearch(board, deferredQuery, searchAttempt);
     } catch {
@@ -208,18 +228,36 @@ export default function BoardSearch({ projectId, onReveal }: Readonly<BoardSearc
     }
   }
 
-  const phase: SearchPhase = searchPhase({
-    query,
-    deferredQuery,
-    resultCount: results.length,
-    failed: searchFailed,
-  });
-  // While the deferred query lags, stale results stay on screen and only the
-  // input-row spinner signals the catch-up — no per-keystroke panel swap.
-  const isCatchingUp = Boolean(trimmed) && trimmed !== deferredTrimmed;
+  const phase: SearchPhase =
+    scope === "board"
+      ? searchPhase({
+          query,
+          deferredQuery,
+          resultCount: results.length,
+          failed: searchFailed,
+        })
+      : serverSearchPhase({
+          query: trimmed,
+          failed: allSearch.isError,
+          hasData: allSearch.data !== undefined,
+          isPlaceholderData: allSearch.isPlaceholderData,
+          resultCount: hits.length,
+        });
+  // While the deferred/debounced query lags, stale results stay on screen and
+  // only the input-row spinner signals the catch-up — no per-keystroke swap.
+  // Pagination is excluded: Load more has its own inline spinner, and blanking
+  // the aria-live count for it would force a redundant re-announcement.
+  const isCatchingUp =
+    scope === "board"
+      ? Boolean(trimmed) && trimmed !== deferredTrimmed
+      : Boolean(trimmed) &&
+        (trimmed !== debouncedQuery || (allSearch.isFetching && !allSearch.isFetchingNextPage));
 
-  const safeIndex = results.length > 0 ? Math.min(activeIndex, results.length - 1) : 0;
-  const countLabel = `${results.length} ${results.length === 1 ? "result" : "results"}`;
+  const optionCount = scope === "board" ? results.length : hits.length;
+  const safeIndex = optionCount > 0 ? Math.min(activeIndex, optionCount - 1) : 0;
+  // Server scope reports the total across all pages, not just the loaded ones.
+  const totalCount = scope === "board" ? results.length : (allSearch.data?.total ?? 0);
+  const countLabel = `${totalCount} ${totalCount === 1 ? "result" : "results"}`;
 
   const recentEntries = recentTickets
     .map((ticketId) => findByTicket(board, ticketId))
@@ -270,31 +308,74 @@ export default function BoardSearch({ projectId, onReveal }: Readonly<BoardSearc
     onReveal(result.task.id);
   };
 
+  const openHit = (hit: ITaskSearchHit) => {
+    // The contract allows a null ticket_id — such a hit has no task route.
+    if (!hit.ticket_id) return;
+    useStoreRecentTasks.getState().recordRecentTask(hit.project_id, hit.ticket_id);
+    setOpen(false);
+    void router.navigate({
+      to: "/projects/$projectId/tasks/$taskId",
+      params: { projectId: hit.project_id, taskId: hit.ticket_id },
+    });
+  };
+
+  const changeScope = (value: string) => {
+    // Radix sends "" when the pressed item is clicked again — keep a scope selected.
+    if (value !== "board" && value !== "all") return;
+    setScope(value);
+    setActiveIndex(0);
+    inputRef.current?.focus();
+  };
+
   const handleInputKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     // Never intercept keys that belong to an IME composition session — the
     // Enter that commits composed text must not open a task.
     if (event.nativeEvent.isComposing) return;
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault();
-      if (results.length === 0) return;
-      const delta = event.key === "ArrowDown" ? 1 : results.length - 1;
-      setActiveIndex((safeIndex + delta) % results.length);
-    } else if (event.key === "Home" || event.key === "End") {
-      if (results.length === 0) return;
+      if (optionCount === 0) return;
+      const delta = event.key === "ArrowDown" ? 1 : optionCount - 1;
+      setActiveIndex((safeIndex + delta) % optionCount);
+    } else if (
+      // Bare Home/End stay with the text caret (APG combobox); the list jump
+      // needs a modifier.
+      (event.key === "Home" || event.key === "End") &&
+      (event.ctrlKey || event.metaKey)
+    ) {
+      if (optionCount === 0) return;
       event.preventDefault();
-      setActiveIndex(event.key === "Home" ? 0 : results.length - 1);
+      setActiveIndex(event.key === "Home" ? 0 : optionCount - 1);
     } else if (event.key === "Enter") {
       event.preventDefault();
-      const hit = results[safeIndex];
-      if (!hit) return;
-      if (event.shiftKey) revealResult(hit);
-      else openTask(hit.task.ticket_id);
+      if (scope === "all") {
+        const hit = hits[safeIndex];
+        if (hit) openHit(hit);
+        return;
+      }
+      const selected = results[safeIndex];
+      if (!selected) return;
+      if (event.shiftKey) revealResult(selected);
+      else openTask(selected.task.ticket_id);
     }
   };
 
   const clearQuery = () => {
     setQuery("");
     setActiveIndex(0);
+    inputRef.current?.focus();
+  };
+
+  const loadMore = () => {
+    if (allSearch.isFetchingNextPage) return;
+    void allSearch.fetchNextPage().then((res) => {
+      // The button unmounts with the last page — don't strand focus.
+      if (!res.hasNextPage) inputRef.current?.focus();
+    });
+  };
+
+  const clearRecents = () => {
+    useStoreRecentTasks.getState().clearRecentTasks(projectId);
+    // The Clear button unmounts with the section — don't strand focus.
     inputRef.current?.focus();
   };
 
@@ -351,7 +432,11 @@ export default function BoardSearch({ projectId, onReveal }: Readonly<BoardSearc
               aria-activedescendant={phase === "results" ? optionId(safeIndex) : undefined}
               autoComplete="off"
               spellCheck={false}
-              placeholder="Search tasks by title, description, label or ticket ID"
+              placeholder={
+                scope === "all"
+                  ? "Search titles and descriptions across all your projects"
+                  : "Search tasks by title, description, label or ticket ID"
+              }
               value={query}
               onChange={(event) => {
                 setQuery(event.target.value);
@@ -375,14 +460,51 @@ export default function BoardSearch({ projectId, onReveal }: Readonly<BoardSearc
             <Kbd className="max-sm:hidden">Esc</Kbd>
           </div>
 
+          <div className="flex shrink-0 items-center border-b px-4 py-2">
+            <ToggleGroup
+              type="single"
+              variant="outline"
+              size="sm"
+              value={scope}
+              onValueChange={changeScope}
+              aria-label="Search scope"
+            >
+              <ToggleGroupItem value="board" className="px-3 text-xs font-semibold">
+                This board
+              </ToggleGroupItem>
+              <ToggleGroupItem value="all" className="px-3 text-xs font-semibold">
+                All projects
+              </ToggleGroupItem>
+            </ToggleGroup>
+          </div>
+
           <div className="min-h-0 flex-1 overflow-y-auto p-2">
-            {phase === "idle" ? (
+            {phase === "idle" && scope === "all" ? (
+              <p className="px-3 py-3.5 text-[12.5px] leading-relaxed text-muted-foreground">
+                Start typing to search every project you belong to — whole words in titles
+                and descriptions, best matches first.
+              </p>
+            ) : null}
+
+            {phase === "idle" && scope === "board" ? (
               <>
                 {recentEntries.length > 0 ? (
                   <div className="px-1 pt-1">
-                    <p className="px-2 text-[10px] font-bold tracking-[0.09em] text-muted-foreground uppercase">
-                      Recently opened
-                    </p>
+                    <div className="flex items-center justify-between pl-2">
+                      <p className="text-[10px] font-bold tracking-[0.09em] text-muted-foreground uppercase">
+                        Recently opened
+                      </p>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="xs"
+                        aria-label="Clear recently opened"
+                        onClick={clearRecents}
+                        className="font-semibold text-muted-foreground"
+                      >
+                        Clear
+                      </Button>
+                    </div>
                     {recentEntries.map(({ task, column }) => (
                       <button
                         key={task.id}
@@ -425,27 +547,71 @@ export default function BoardSearch({ projectId, onReveal }: Readonly<BoardSearc
                 <p className="max-w-[38ch] text-[12.5px] leading-relaxed text-muted-foreground">
                   We couldn't run the search. Your board is unaffected.
                 </p>
-                <Button size="sm" className="mt-1" onClick={() => setSearchAttempt((n) => n + 1)}>
+                <Button
+                  size="sm"
+                  className="mt-1"
+                  onClick={
+                    scope === "board"
+                      ? () => setSearchAttempt((n) => n + 1)
+                      : () => void allSearch.refetch()
+                  }
+                >
                   Try again
                 </Button>
               </div>
             ) : null}
 
             {phase === "results" ? (
-              <div id={LISTBOX_ID} role="listbox" aria-label="Search results" className="flex flex-col gap-0.5">
-                {results.map((result, index) => (
-                  <ResultRow
-                    key={result.task.id}
-                    result={result}
-                    index={index}
-                    active={index === safeIndex}
-                    query={deferredQuery}
-                    onOpen={(r) => openTask(r.task.ticket_id)}
-                    onReveal={revealResult}
-                    onHover={setActiveIndex}
-                  />
-                ))}
-              </div>
+              <>
+                <div id={LISTBOX_ID} role="listbox" aria-label="Search results" className="flex flex-col gap-0.5">
+                  {scope === "board"
+                    ? results.map((result, index) => (
+                        <ResultRow
+                          key={result.task.id}
+                          result={result}
+                          index={index}
+                          active={index === safeIndex}
+                          query={deferredQuery}
+                          onOpen={(r) => openTask(r.task.ticket_id)}
+                          onReveal={revealResult}
+                          onHover={setActiveIndex}
+                        />
+                      ))
+                    : hits.map((hit, index) => (
+                        <SearchHitRow
+                          key={hit.id}
+                          hit={hit}
+                          id={optionId(index)}
+                          active={index === safeIndex}
+                          projectName={projectNameById.get(hit.project_id) ?? "Unknown project"}
+                          onOpen={openHit}
+                          onHover={() => setActiveIndex(index)}
+                        />
+                      ))}
+                </div>
+                {scope === "all" && allSearch.hasNextPage ? (
+                  <div className="px-1 pt-1.5 pb-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      // aria-disabled, not disabled: a disabled button drops focus mid-fetch.
+                      aria-disabled={allSearch.isFetchingNextPage}
+                      aria-busy={allSearch.isFetchingNextPage}
+                      onClick={loadMore}
+                      className="w-full font-semibold text-muted-foreground aria-disabled:opacity-50"
+                    >
+                      {allSearch.isFetchingNextPage ? (
+                        <LoaderCircle
+                          className="size-3.5 animate-spin motion-reduce:animate-none"
+                          aria-hidden
+                        />
+                      ) : null}
+                      Load more
+                    </Button>
+                  </div>
+                ) : null}
+              </>
             ) : null}
 
             {phase === "empty" ? (
@@ -453,12 +619,26 @@ export default function BoardSearch({ projectId, onReveal }: Readonly<BoardSearc
                 <span className="flex size-11 items-center justify-center rounded-xl bg-muted text-muted-foreground">
                   <Search className="size-5" aria-hidden />
                 </span>
-                <p className="text-[13.5px] font-bold text-foreground">
-                  No cards match “{deferredTrimmed}”
-                </p>
-                <p className="max-w-[38ch] text-[12.5px] leading-relaxed text-muted-foreground">
-                  Try fewer words, or search by a ticket ID. This searches the current board only.
-                </p>
+                {scope === "board" ? (
+                  <>
+                    <p className="text-[13.5px] font-bold text-foreground">
+                      No cards match “{deferredTrimmed}”
+                    </p>
+                    <p className="max-w-[38ch] text-[12.5px] leading-relaxed text-muted-foreground">
+                      Try fewer words, or search by a ticket ID. This searches the current board only.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-[13.5px] font-bold text-foreground">
+                      No tasks match “{debouncedQuery}” in your projects
+                    </p>
+                    <p className="max-w-[38ch] text-[12.5px] leading-relaxed text-muted-foreground">
+                      Search matches whole words in titles and descriptions — try the full
+                      word, or switch to “This board” for partial matches.
+                    </p>
+                  </>
+                )}
               </div>
             ) : null}
           </div>
@@ -479,14 +659,16 @@ export default function BoardSearch({ projectId, onReveal }: Readonly<BoardSearc
                 </Kbd>{" "}
                 Open
               </span>
-              <span className="flex items-center gap-1.5">
-                <Kbd>
-                  <span aria-hidden>⇧</span>
-                  <CornerDownLeft className="size-3" aria-hidden />
-                  <span className="sr-only">Shift Enter</span>
-                </Kbd>{" "}
-                Reveal on board
-              </span>
+              {scope === "board" ? (
+                <span className="flex items-center gap-1.5">
+                  <Kbd>
+                    <span aria-hidden>⇧</span>
+                    <CornerDownLeft className="size-3" aria-hidden />
+                    <span className="sr-only">Shift Enter</span>
+                  </Kbd>{" "}
+                  Reveal on board
+                </span>
+              ) : null}
             </div>
             <div role="status" aria-live="polite" className="text-[11px] font-semibold text-muted-foreground">
               {!isCatchingUp && (phase === "results" || phase === "empty") ? countLabel : ""}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isDoneColumn, searchPhase, searchTasks, segments, snippet, stripHtml } from "../search";
+import { isDoneColumn, searchPhase, searchTasks, segments, serverSearchPhase, snippet, snippetSegments, stripHtml } from "../search";
 import { createColumn, createTask } from "@/test-factories";
 import type { IBoard, IColumn, ITask } from "@/types";
 
@@ -336,5 +336,81 @@ describe("search-doc caching", () => {
 
     expect(searchTasks(board, "alpha")).toHaveLength(1);
     expect(searchTasks(board, "alpha")).toHaveLength(1);
+  });
+});
+
+describe("serverSearchPhase", () => {
+  const settled = {
+    query: "login",
+    failed: false,
+    hasData: true,
+    isPlaceholderData: false,
+    resultCount: 3,
+  };
+
+  it("is idle with no query, whatever the data state", () => {
+    expect(serverSearchPhase({ ...settled, query: "" })).toBe("idle");
+  });
+
+  it("is searching before the first response arrives", () => {
+    expect(serverSearchPhase({ ...settled, hasData: false, resultCount: 0 })).toBe("searching");
+  });
+
+  it("keeps showing the previous query's results while a newer one is in flight", () => {
+    expect(serverSearchPhase({ ...settled, isPlaceholderData: true })).toBe("results");
+  });
+
+  it("treats a placeholder empty page as still searching, not as no matches", () => {
+    expect(serverSearchPhase({ ...settled, isPlaceholderData: true, resultCount: 0 })).toBe("searching");
+  });
+
+  it("is empty only when the current query's own page has no hits", () => {
+    expect(serverSearchPhase({ ...settled, resultCount: 0 })).toBe("empty");
+  });
+
+  it("is error whenever the request failed", () => {
+    expect(serverSearchPhase({ ...settled, failed: true })).toBe("error");
+  });
+});
+
+describe("snippetSegments", () => {
+  it("splits server <mark> highlights into hit segments", () => {
+    expect(snippetSegments("Fix <mark>login</mark> page")).toEqual([
+      { text: "Fix ", hit: false },
+      { text: "login", hit: true },
+      { text: " page", hit: false },
+    ]);
+  });
+
+  it("decodes the entities the server's HTML-escaping produces", () => {
+    expect(snippetSegments("a &lt;b&gt; &amp; &quot;c&quot; &#39;d&#39;")).toEqual([
+      { text: "a <b> & \"c\" 'd'", hit: false },
+    ]);
+  });
+
+  it("decodes double-escaped entities to their literal form (&amp; last)", () => {
+    expect(snippetSegments("&amp;lt;script&amp;gt;")).toEqual([
+      { text: "&lt;script&gt;", hit: false },
+    ]);
+  });
+
+  it("treats any other markup as literal text, never as HTML", () => {
+    const parts = snippetSegments('x<img src="x" onerror="p()"><script>p()</script>');
+    expect(parts.every((part) => !part.hit)).toBe(true);
+    expect(parts.map((part) => part.text).join("")).toBe(
+      'x<img src="x" onerror="p()"><script>p()</script>',
+    );
+  });
+
+  it("handles multiple excerpts and marks", () => {
+    expect(snippetSegments("<mark>a</mark> ... <mark>b</mark>")).toEqual([
+      { text: "a", hit: true },
+      { text: " ... ", hit: false },
+      { text: "b", hit: true },
+    ]);
+  });
+
+  it("returns no segments for an empty snippet", () => {
+    expect(snippetSegments("")).toEqual([]);
   });
 });

@@ -1,11 +1,12 @@
 import type { IBoard, IColumn, ITask } from "@/types";
 
 /**
- * Client-side board search (JAV-35).
+ * Search overlay helpers — pure module, no React.
  *
- * Pure module — no React. Searches the board already loaded in the store
- * across titles, ticket ids, descriptions, label names and column names,
+ * Client-side board search (JAV-35): searches the board already loaded in the
+ * store across titles, ticket ids, descriptions, label names and column names,
  * with typo tolerance ("palete" finds "Palette") and best-first ranking.
+ * Also hosts the phase/snippet helpers for the server-backed scope (JSP-38).
  */
 
 const MAX_RESULTS = 40;
@@ -49,14 +50,7 @@ function isDoneColumn(name: string): boolean {
  */
 function stripHtml(html: string): string {
   if (!html) return "";
-  return html
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'")
+  return decodeEntities(html.replace(/<[^>]+>/g, " "))
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -268,6 +262,67 @@ function searchPhase({ query, deferredQuery, resultCount, failed }: ISearchPhase
   return resultCount > 0 ? "results" : "empty";
 }
 
+/** `&amp;` must decode last, so a double-escaped `&amp;lt;` yields the literal `&lt;`, not `<`. */
+function decodeEntities(text: string): string {
+  return text
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&amp;/gi, "&");
+}
+
+/**
+ * Parse a server search snippet into highlight segments. Rendering segments
+ * through React keeps any markup other than `<mark>` inert — no innerHTML.
+ */
+function snippetSegments(snippet: string): ISegment[] {
+  const parts: ISegment[] = [];
+  const markRe = /<mark>(.*?)<\/mark>/gis;
+  let last = 0;
+  let match = markRe.exec(snippet);
+  while (match !== null) {
+    if (match.index > last) {
+      parts.push({ text: decodeEntities(snippet.slice(last, match.index)), hit: false });
+    }
+    if (match[1]) parts.push({ text: decodeEntities(match[1]), hit: true });
+    last = match.index + match[0].length;
+    match = markRe.exec(snippet);
+  }
+  if (last < snippet.length) {
+    parts.push({ text: decodeEntities(snippet.slice(last)), hit: false });
+  }
+  return parts;
+}
+
+interface IServerSearchPhaseInput {
+  query: string;
+  failed: boolean;
+  hasData: boolean;
+  /** True while the shown data belongs to the previous query (keepPreviousData). */
+  isPlaceholderData: boolean;
+  resultCount: number;
+}
+
+/**
+ * Phase for the server-backed all-projects scope (JSP-38). A placeholder empty
+ * page belongs to the previous query and must read as "searching", not "empty".
+ */
+function serverSearchPhase({
+  query,
+  failed,
+  hasData,
+  isPlaceholderData,
+  resultCount,
+}: IServerSearchPhaseInput): SearchPhase {
+  if (!query) return "idle";
+  if (failed) return "error";
+  if (!hasData) return "searching";
+  if (resultCount > 0) return "results";
+  return isPlaceholderData ? "searching" : "empty";
+}
+
 /** Short plain-text excerpt of the description around the first matching token. */
 function snippet(descriptionHtml: string, query: string): string {
   const plain = stripHtml(descriptionHtml);
@@ -286,5 +341,14 @@ function snippet(descriptionHtml: string, query: string): string {
   return (start > 0 ? "…" : "") + plain.slice(start, end).trim() + (end < plain.length ? "…" : "");
 }
 
-export { isDoneColumn, searchPhase, searchTasks, segments, snippet, stripHtml };
-export type { ISearchPhaseInput, ISearchResult, ISegment, SearchPhase };
+export {
+  isDoneColumn,
+  searchPhase,
+  searchTasks,
+  segments,
+  serverSearchPhase,
+  snippet,
+  snippetSegments,
+  stripHtml,
+};
+export type { ISearchPhaseInput, IServerSearchPhaseInput, ISearchResult, ISegment, SearchPhase };
