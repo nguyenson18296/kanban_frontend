@@ -57,6 +57,26 @@ describe("useStoreRecentTasks", () => {
     expect(map.p11).toEqual(["KAN-1"]);
   });
 
+  it("clears one project's recents and leaves other projects untouched", () => {
+    const { recordRecentTask, clearRecentTasks } = useStoreRecentTasks.getState();
+    recordRecentTask("p1", "KAN-1");
+    recordRecentTask("p2", "KAN-9");
+
+    clearRecentTasks("p1");
+
+    expect(useStoreRecentTasks.getState().recentByProject).toEqual({ p2: ["KAN-9"] });
+  });
+
+  it("clearing a project with no recents is a no-op that keeps the same map reference", () => {
+    useStoreRecentTasks.getState().recordRecentTask("p2", "KAN-9");
+    const before = useStoreRecentTasks.getState().recentByProject;
+
+    useStoreRecentTasks.getState().clearRecentTasks("p1");
+
+    // Same reference — no subscriber re-render, no persist write.
+    expect(useStoreRecentTasks.getState().recentByProject).toBe(before);
+  });
+
   it("migrates v1 payloads by keeping their shape", async () => {
     window.localStorage.setItem(
       "recent-tasks-store",
@@ -66,6 +86,19 @@ describe("useStoreRecentTasks", () => {
     await useStoreRecentTasks.persist.rehydrate();
 
     expect(useStoreRecentTasks.getState().recentByProject.p1).toEqual(["KAN-9"]);
+  });
+
+  it("degrades a malformed persisted payload to no recents instead of crashing", async () => {
+    window.localStorage.setItem(
+      "recent-tasks-store",
+      JSON.stringify({ state: { recentByProject: null }, version: 1 }),
+    );
+
+    await useStoreRecentTasks.persist.rehydrate();
+
+    expect(useStoreRecentTasks.getState().recentByProject).toEqual({});
+    // The selector path board-search uses must survive rehydration.
+    expect(useStoreRecentTasks.getState().recentByProject["p1"]).toBeUndefined();
   });
 
   it("persists to versioned localStorage so recents survive a reload", () => {

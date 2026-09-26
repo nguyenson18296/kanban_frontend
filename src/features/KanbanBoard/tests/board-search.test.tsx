@@ -1,9 +1,11 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import BoardSearch from "../board-search";
 import { searchTasks } from "../search";
+import { getMyProjects } from "@/services/project.service";
 import { useStoreKanbanBoard } from "@/stores/use-store-kanban-board";
 import { useStoreRecentTasks } from "@/stores/use-store-recent-tasks";
 import { createColumn, createTask } from "@/test-factories";
@@ -21,6 +23,11 @@ vi.mock("../search", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../search")>();
   return { ...actual, searchTasks: vi.fn(actual.searchTasks) };
 });
+
+// The overlay mounts the all-projects query hooks even in board scope
+// (disabled while unused) — keep their services away from the network.
+vi.mock("@/services/search.service");
+vi.mock("@/services/project.service");
 
 const board = (): IBoard => ({
   columns: [
@@ -55,7 +62,12 @@ const board = (): IBoard => ({
 const onReveal = vi.fn();
 
 function renderSearch() {
-  return render(<BoardSearch projectId="p1" onReveal={onReveal} />);
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <BoardSearch projectId="p1" onReveal={onReveal} />
+    </QueryClientProvider>,
+  );
 }
 
 async function openViaButton(user: ReturnType<typeof userEvent.setup>) {
@@ -65,6 +77,7 @@ async function openViaButton(user: ReturnType<typeof userEvent.setup>) {
 
 beforeEach(() => {
   useStoreKanbanBoard.setState({ kanbanBoard: board() });
+  vi.mocked(getMyProjects).mockResolvedValue({ data: [], status: 200, success: true });
 });
 
 afterEach(() => {
@@ -149,6 +162,23 @@ describe("BoardSearch before typing", () => {
     expect(screen.getByRole("button", { name: /command palette/i })).toBeInTheDocument();
     expect(screen.queryByText("KAN-999")).not.toBeInTheDocument();
     expect(screen.getByText(/start typing to search/i)).toBeInTheDocument();
+  });
+
+  it("clears this project's recently opened list, leaving other projects alone", async () => {
+    useStoreRecentTasks.setState({ recentByProject: { p1: ["KAN-104"], p2: ["KAN-999"] } });
+    const user = userEvent.setup();
+    renderSearch();
+
+    const input = await openViaButton(user);
+    expect(screen.getByText(/recently opened/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /clear recently opened/i }));
+
+    expect(screen.queryByText(/recently opened/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/start typing to search/i)).toBeInTheDocument();
+    expect(useStoreRecentTasks.getState().recentByProject).toEqual({ p2: ["KAN-999"] });
+    // The Clear button vanished with the section — focus must not be dropped.
+    expect(input).toHaveFocus();
   });
 
   it("returns to the recent-cards view when the input is cleared", async () => {
@@ -266,15 +296,19 @@ describe("BoardSearch keyboard navigation", () => {
     expect(selectedTitles(listbox).join(" ")).toContain("Ship search analytics");
   });
 
-  it("jumps to first and last with Home and End", async () => {
+  it("jumps to first and last with Ctrl+Home and Ctrl+End, leaving bare Home/End to the caret", async () => {
     const user = userEvent.setup();
     renderSearch();
     const { listbox } = await openWithThreeResults(user);
 
-    await user.keyboard("{End}");
+    await user.keyboard("{Control>}{End}{/Control}");
     expect(selectedTitles(listbox).join(" ")).toContain("Ship search analytics");
 
-    await user.keyboard("{Home}");
+    await user.keyboard("{Control>}{Home}{/Control}");
+    expect(selectedTitles(listbox).join(" ")).toContain("Implement Project Invitation Flow");
+
+    // Bare Home/End belong to the text caret (APG combobox) — no list jump.
+    await user.keyboard("{End}");
     expect(selectedTitles(listbox).join(" ")).toContain("Implement Project Invitation Flow");
   });
 

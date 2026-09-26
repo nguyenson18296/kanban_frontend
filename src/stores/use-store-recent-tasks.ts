@@ -11,6 +11,7 @@ interface IStoreRecentTasks {
   /** projectId -> ticket ids of recently opened tasks, newest first. */
   recentByProject: Record<string, string[]>;
   recordRecentTask: (projectId: string, ticketId: string) => void;
+  clearRecentTasks: (projectId: string) => void;
 }
 
 /**
@@ -37,13 +38,29 @@ export const useStoreRecentTasks = create<IStoreRecentTasks>()(
           const kept = others.slice(-(MAX_RECENT_PROJECTS - 1));
           return { recentByProject: { ...Object.fromEntries(kept), [projectId]: next } };
         }),
+      clearRecentTasks: (projectId) =>
+        set((state) => {
+          // Nothing to clear — return the same state so subscribers and the
+          // persist middleware see no change.
+          if (!(projectId in state.recentByProject)) return state;
+          const rest = { ...state.recentByProject };
+          delete rest[projectId];
+          return { recentByProject: rest };
+        }),
     }),
     {
       name: 'recent-tasks-store',
-      // v2 introduced project pruning; the persisted shape is unchanged, so the
-      // migration keeps v1 payloads as-is (actions come from code, not storage).
+      // v2 introduced project pruning; the persisted shape is unchanged. Still
+      // guard the localStorage payload — a malformed one must degrade to "no
+      // recents", not crash every selector read.
       version: 2,
-      migrate: (persisted) => persisted as IStoreRecentTasks,
+      migrate: (persisted) => {
+        const state = persisted as Partial<Pick<IStoreRecentTasks, 'recentByProject'>> | null;
+        const map = state?.recentByProject;
+        return {
+          recentByProject: map && typeof map === 'object' && !Array.isArray(map) ? map : {},
+        } as IStoreRecentTasks;
+      },
     },
   ),
 );
