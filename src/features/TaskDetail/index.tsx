@@ -145,6 +145,7 @@ export default function TaskDetail() {
           onPriorityChange={handlePriorityChange}
           key={task.id}
           id={task.id}
+          projectId={projectId}
           column_id={task.column_id}
           labels={task.labels}
           due_date={task.due_date}
