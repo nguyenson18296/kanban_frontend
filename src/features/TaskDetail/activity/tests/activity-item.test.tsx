@@ -163,6 +163,38 @@ describe("ActivityItem", () => {
       );
       expect(screen.getByText(/reordered this task/)).toBeInTheDocument();
     });
+
+    it("renders task_dependency_added with ticket and title", () => {
+      render(
+        <ActivityItem
+          activity={createActivity({
+            action: TaskActivityAction.TASK_DEPENDENCY_ADDED,
+            payload: {
+              dependencies: [{ task_id: "t1", ticket_id: "KAN-12", title: "Design schema" }],
+            },
+          })}
+        />,
+      );
+      expect(screen.getByText(/marked this as blocked by/)).toBeInTheDocument();
+      expect(screen.getByText("KAN-12")).toBeInTheDocument();
+      expect(screen.getByText("Design schema")).toBeInTheDocument();
+    });
+
+    it("renders task_dependency_removed and falls back to the task id when ticket and title are null", () => {
+      render(
+        <ActivityItem
+          activity={createActivity({
+            action: TaskActivityAction.TASK_DEPENDENCY_REMOVED,
+            payload: {
+              // A removal whose blocker had left the project carries null title.
+              dependencies: [{ task_id: "9f1c2b3a", ticket_id: null, title: null }],
+            },
+          })}
+        />,
+      );
+      expect(screen.getByText(/removed blocked by/)).toBeInTheDocument();
+      expect(screen.getByText("9f1c2b3a")).toBeInTheDocument();
+    });
   });
 
   it("renders actor avatar with fallback initials", () => {

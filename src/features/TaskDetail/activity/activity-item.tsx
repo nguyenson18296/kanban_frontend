@@ -2,6 +2,7 @@ import { formatDistanceToNow, format } from "date-fns";
 import {
   ArrowRight,
   ArrowRightLeft,
+  Ban,
   CalendarDays,
   FileText,
   GripVertical,
@@ -22,6 +23,7 @@ import type {
   DueDateChangePayload,
   AssigneeChangePayload,
   LabelChangePayload,
+  DependencyChangePayload,
 } from "@/types";
 import { UserAvatar } from "@/components/UserAvatar";
 
@@ -57,6 +59,10 @@ function getActionStyle(action: string): ActionStyle {
       return { icon: <ArrowRightLeft className="size-3.5" />, bg: "bg-cyan-100", text: "text-cyan-600" };
     case TaskActivityAction.TASK_REORDERED:
       return { icon: <GripVertical className="size-3.5" />, bg: "bg-gray-100", text: "text-gray-500" };
+    case TaskActivityAction.TASK_DEPENDENCY_ADDED:
+      return { icon: <Ban className="size-3.5" />, bg: "bg-red-100", text: "text-red-500" };
+    case TaskActivityAction.TASK_DEPENDENCY_REMOVED:
+      return { icon: <Ban className="size-3.5" />, bg: "bg-gray-100", text: "text-gray-500" };
     default:
       return { icon: <Pencil className="size-3.5" />, bg: "bg-gray-100", text: "text-gray-500" };
   }
@@ -222,6 +228,28 @@ function ActivityContent({ activity }: Readonly<{ activity: IActivity }>) {
 
     case TaskActivityAction.TASK_REORDERED:
       return <p className="text-[13px] text-[#475569] m-0">{name} reordered this task</p>;
+
+    case TaskActivityAction.TASK_DEPENDENCY_ADDED:
+    case TaskActivityAction.TASK_DEPENDENCY_REMOVED: {
+      const removed = action === TaskActivityAction.TASK_DEPENDENCY_REMOVED;
+      const dependencies = (payload as DependencyChangePayload).dependencies ?? [];
+      return (
+        <p className="text-[13px] text-[#475569] m-0">
+          {name} {removed ? "removed blocked by" : "marked this as blocked by"}{" "}
+          {dependencies.map((dep, i) => (
+            <span key={dep.task_id}>
+              <span
+                className={`rounded-md px-2 py-0.5 font-mono text-xs font-semibold ${DEFAULT_BADGE_STYLE} ${removed ? "line-through opacity-60" : ""}`}
+              >
+                {dep.ticket_id ?? dep.task_id}
+              </span>
+              {dep.title && <span> {dep.title}</span>}
+              {i < dependencies.length - 1 && ", "}
+            </span>
+          ))}
+        </p>
+      );
+    }
 
     default:
       return <p className="text-[13px] text-[#475569] m-0">{name} updated this task</p>;

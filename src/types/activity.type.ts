@@ -11,6 +11,8 @@ export const TaskActivityAction = {
   TASK_LABEL_REMOVED: 'task_label_removed',
   TASK_MOVED: 'task_moved',
   TASK_REORDERED: 'task_reordered',
+  TASK_DEPENDENCY_ADDED: 'task_dependency_added',
+  TASK_DEPENDENCY_REMOVED: 'task_dependency_removed',
 } as const;
 
 export type TaskActivityAction = (typeof TaskActivityAction)[keyof typeof TaskActivityAction];
@@ -50,6 +52,15 @@ interface TaskReorderedPayload {
   position: number;
 }
 
+interface DependencyChangePayload {
+  dependencies: {
+    task_id: string;
+    ticket_id: string | null;
+    /** null on a removal whose blocker had left the project. */
+    title: string | null;
+  }[];
+}
+
 type ActivityPayload =
   | Record<string, never>
   | FieldChangePayload
@@ -57,7 +68,8 @@ type ActivityPayload =
   | AssigneeChangePayload
   | LabelChangePayload
   | TaskMovedPayload
-  | TaskReorderedPayload;
+  | TaskReorderedPayload
+  | DependencyChangePayload;
 
 interface IActivity {
   id: string;
@@ -87,4 +99,5 @@ export type {
   LabelChangePayload,
   TaskMovedPayload,
   TaskReorderedPayload,
+  DependencyChangePayload,
 };

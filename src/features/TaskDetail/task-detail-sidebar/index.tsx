@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 import { useStoreKanbanBoard } from "@/stores/use-store-kanban-board";
 import { useStoreOptimisticActivities, createOptimisticActivity } from "@/stores/use-store-optimistic-activities";
 import { useMoveTaskToColumn } from "@/features/KanbanBoard/hooks/use-move-task-to-column";
+import TaskDependencies from "@/features/TaskDetail/dependencies";
 
 function getInitials(name: string): string {
   return name
@@ -33,6 +34,7 @@ function getInitials(name: string): string {
 
 interface TaskDetailSidebarProps {
   id: string;
+  projectId: string;
   column_id: number;
   assignees: TAssignee[];
   due_date: ITask['due_date'];
@@ -48,6 +50,7 @@ export default function TaskDetailSidebar({
   assignees,
   priority,
   id,
+  projectId,
   column_id,
   due_date,
   onAssigneeChange,
@@ -193,6 +196,8 @@ export default function TaskDetailSidebar({
           <Label className="my-2">Due date</Label>
           <DueDateDropdown dueDate={localDueDate} taskId={id} onDueDateChange={handleDueDateChange} triggerClassName="w-[100px] h-8" />
         </div>
+        <Separator />
+        <TaskDependencies taskId={id} projectId={projectId} />
       </CardContent>
     </Card>
   );

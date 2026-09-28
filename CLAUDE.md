@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Kanban board application: a **client-only single-page app** built with React 19, TypeScript, and Vite 7. Features are implemented (boards, columns, drag-and-drop tasks, board search, task detail, subtasks, comments, activity feed, notifications, auth, real-time updates, task subscriptions).
+Kanban board application: a **client-only single-page app** built with React 19, TypeScript, and Vite 7. Features are implemented (boards, columns, drag-and-drop tasks, board search, task detail, subtasks, comments, activity feed, notifications, auth, real-time updates, task subscriptions, task dependencies).
 
 **There is NO backend in this repo, NO Next.js, NO SSR, and NO React Server Components.** Everything ships to the browser. Ignore any guidance (including from the skills below) about RSC / server actions / server components / streaming SSR / Next.js routing or metadata — none of it applies.
 
@@ -61,7 +61,7 @@ Path alias `@/` → `./src` (declared in `vite.config.ts`, `tsconfig.app.json`, 
 
 **Data flow:** `service` → colocated Query hook (`useQuery`/`useMutation`) → components. Two consumption shapes coexist:
 - **Mutable board** (the drag-and-drop surface): the hook pushes server data into a Zustand store *inside* `queryFn` (`use-get-board.ts` calls `setKanbanBoard(board)`), and components read the store via **atomic selectors**. The Query cache owns fetching/staleness; the store holds a mutable copy the board patches optimistically.
-- **Read-only server data** (e.g. the subscription feature): consumed straight from the Query cache. `use-subscription-status.ts` / `use-subscribers.ts` are thin `useQuery` wrappers around the service call (with `signal` + `enabled: !!taskId`) and **no Zustand mirror**; `subscribers.tsx` reads `status?.subscribed` / `subscribersData?.items` directly.
+- **Read-only server data** (e.g. the subscription feature): consumed straight from the Query cache. `use-subscription-status.ts` / `use-subscribers.ts` are thin `useQuery` wrappers around the service call (with `signal` + `enabled: !!taskId`) and **no Zustand mirror**; `subscribers.tsx` reads `status?.subscribed` / `subscribersData?.items` directly. **Task dependencies (JSP-39)** follow the same shape (contract: backend repo `docs/api-contracts/task-dependencies.md`): `services/dependency.service.ts` → `features/TaskDetail/dependencies/` hooks on key `['dependencies', taskId]`. Every API route is addressed by the *blocked* task, so a "blocks" link posts/deletes on the *other* task with the current task's id; mutations invalidate both tasks' keys + the route task's `['activities', id]`. Adds are deliberately **not optimistic** (a 409 cycle rejection is a normal outcome — the server's message is user-presentable and toasted as-is); removals use the cache-backed optimistic pattern.
 
 Components never call services directly and never call `fetch` directly.
 
