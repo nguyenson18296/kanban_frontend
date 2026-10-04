@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { CloudUpload, Lock, Paperclip } from "lucide-react";
+import { CloudUpload, Download, Lock, Paperclip } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -16,7 +16,10 @@ import { useStoreUser } from "@/stores/use-store-user";
 import type { ITaskAttachment } from "@/types";
 
 import AttachmentRow from "./attachment-row";
+import AttachmentTile from "./attachment-tile";
 import UploadQueue from "./upload-queue";
+import { formatBytes } from "./file-rules";
+import { useAttachmentPreview } from "./hooks/use-attachment-preview";
 import { useDeleteAttachment } from "./hooks/use-delete-attachment";
 import { useDownloadAttachment } from "./hooks/use-download-attachment";
 import { useTaskAttachments } from "./hooks/use-task-attachments";
@@ -37,6 +40,7 @@ export default function TaskAttachments({
 }: Readonly<TaskAttachmentsProps>) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pendingDelete, setPendingDelete] = useState<ITaskAttachment | null>(null);
+  const [previewAttachment, setPreviewAttachment] = useState<ITaskAttachment | null>(null);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const dragDepthRef = useRef(0);
 
@@ -112,6 +116,28 @@ export default function TaskAttachments({
 
   const attachments = data?.attachments ?? [];
   const total = data?.total ?? 0;
+  const images = attachments.filter((a) => a.content_type.startsWith("image/"));
+  const documents = attachments.filter((a) => !a.content_type.startsWith("image/"));
+
+  const canDeleteAttachment = (attachment: ITaskAttachment) =>
+    canManage || (canUpload && attachment.uploaded_by?.id === currentUserId);
+  const isDownloadingAttachment = (attachment: ITaskAttachment) =>
+    downloadAttachment.isPending && downloadAttachment.variables?.attachmentId === attachment.id;
+  const isDeletingAttachment = (attachment: ITaskAttachment) =>
+    deleteAttachment.isPending && deleteAttachment.variables?.attachmentId === attachment.id;
+  const startDownload = (attachment: ITaskAttachment) =>
+    downloadAttachment.mutate({
+      taskId,
+      attachmentId: attachment.id,
+      fileName: attachment.file_name,
+    });
+
+  // Large preview for the open tile; cache-shared with the tile's thumbnail fetch.
+  const lightbox = useAttachmentPreview(
+    taskId,
+    previewAttachment?.id ?? "",
+    previewAttachment !== null,
+  );
 
   return (
     <section aria-label="Attachments" className="my-4">
@@ -182,30 +208,34 @@ export default function TaskAttachments({
         </div>
       )}
 
-      {attachments.length > 0 && (
+      {images.length > 0 && (
+        <div className="mb-3 grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-x-2.5 gap-y-3">
+          {images.map((attachment) => (
+            <AttachmentTile
+              key={attachment.id}
+              taskId={taskId}
+              attachment={attachment}
+              canDelete={canDeleteAttachment(attachment)}
+              isDownloading={isDownloadingAttachment(attachment)}
+              isDeleting={isDeletingAttachment(attachment)}
+              onPreview={() => setPreviewAttachment(attachment)}
+              onDownload={() => startDownload(attachment)}
+              onRequestDelete={() => setPendingDelete(attachment)}
+            />
+          ))}
+        </div>
+      )}
+
+      {documents.length > 0 && (
         <div className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-card">
-          {attachments.map((attachment) => (
+          {documents.map((attachment) => (
             <AttachmentRow
               key={attachment.id}
               attachment={attachment}
-              canDelete={
-                canManage || (canUpload && attachment.uploaded_by?.id === currentUserId)
-              }
-              isDownloading={
-                downloadAttachment.isPending &&
-                downloadAttachment.variables?.attachmentId === attachment.id
-              }
-              isDeleting={
-                deleteAttachment.isPending &&
-                deleteAttachment.variables?.attachmentId === attachment.id
-              }
-              onDownload={() =>
-                downloadAttachment.mutate({
-                  taskId,
-                  attachmentId: attachment.id,
-                  fileName: attachment.file_name,
-                })
-              }
+              canDelete={canDeleteAttachment(attachment)}
+              isDownloading={isDownloadingAttachment(attachment)}
+              isDeleting={isDeletingAttachment(attachment)}
+              onDownload={() => startDownload(attachment)}
               onRequestDelete={() => setPendingDelete(attachment)}
             />
           ))}
@@ -291,6 +321,48 @@ export default function TaskAttachments({
           </div>
         </div>
       )}
+
+      <Dialog
+        open={previewAttachment !== null}
+        onOpenChange={(open) => {
+          if (!open) setPreviewAttachment(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="break-all">{previewAttachment?.file_name}</DialogTitle>
+            <DialogDescription>
+              {previewAttachment
+                ? `${formatBytes(previewAttachment.size_bytes)} · ${
+                    previewAttachment.uploaded_by?.full_name ?? "Deleted user"
+                  }`
+                : ""}
+            </DialogDescription>
+          </DialogHeader>
+          {previewAttachment && lightbox.data?.url ? (
+            <img
+              src={lightbox.data.url}
+              alt={previewAttachment.file_name}
+              className="max-h-[70vh] w-full rounded-md bg-muted object-contain"
+            />
+          ) : (
+            <div className="flex h-56 items-center justify-center rounded-md bg-muted text-sm text-muted-foreground">
+              {lightbox.isError ? "Couldn't load the preview" : "Loading preview…"}
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={previewAttachment ? isDownloadingAttachment(previewAttachment) : false}
+              onClick={() => previewAttachment && startDownload(previewAttachment)}
+            >
+              <Download aria-hidden="true" />
+              Download
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={pendingDelete !== null}

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -53,25 +53,44 @@ function png(name = "new-shot.png"): File {
   return new File([new Uint8Array(8)], name, { type: "image/png" });
 }
 
+const SIGNED_URL = "https://storage.example.com/task-attachments/abc?X-Amz-Signature=sig";
+
+function makePdf(overrides: Parameters<typeof makeAttachment>[0] = {}) {
+  return makeAttachment({
+    file_name: "product-spec.pdf",
+    content_type: "application/pdf",
+    ...overrides,
+  });
+}
+
 beforeEach(() => {
   useStoreUser.setState({
     user: { id: ME.id, email: ME.email, full_name: ME.full_name, role: ME.role, avatar_url: "" },
   });
   vi.mocked(getTaskAttachments).mockResolvedValue(makePage([makeAttachment()]));
+  // Image tiles request a signed preview URL as soon as they mount.
+  vi.mocked(getAttachmentDownload).mockResolvedValue({
+    url: SIGNED_URL,
+    expires_at: "2026-09-26T10:05:00.000Z",
+  });
   seedRole("member");
 });
 
 afterEach(() => {
   cleanup();
+  // clearAllMocks wipes the module auto-mocks' call history; restoreAllMocks
+  // removes vi.spyOn spies (the anchor-click one). Both are needed.
   vi.clearAllMocks();
+  vi.restoreAllMocks();
   useStoreUser.setState({ user: null });
 });
 
 describe("TaskAttachments — list", () => {
-  it("renders each attachment with its size, uploader and age", async () => {
+  it("renders a document row with its size, uploader and age", async () => {
+    vi.mocked(getTaskAttachments).mockResolvedValue(makePage([makePdf()]));
     renderAttachments();
 
-    expect(await screen.findByText("login-bug.png")).toBeInTheDocument();
+    expect(await screen.findByText("product-spec.pdf")).toBeInTheDocument();
     expect(screen.getByText(/470\.8 KB/)).toBeInTheDocument();
     expect(screen.getByText(/Son Nguyen/)).toBeInTheDocument();
     expect(screen.getByText(/ago/)).toBeInTheDocument();
@@ -79,9 +98,7 @@ describe("TaskAttachments — list", () => {
   });
 
   it("names a deleted uploader gracefully", async () => {
-    vi.mocked(getTaskAttachments).mockResolvedValue(
-      makePage([makeAttachment({ uploaded_by: null })]),
-    );
+    vi.mocked(getTaskAttachments).mockResolvedValue(makePage([makePdf({ uploaded_by: null })]));
     renderAttachments();
 
     expect(await screen.findByText(/Deleted user/)).toBeInTheDocument();
@@ -229,21 +246,70 @@ describe("TaskAttachments — upload", () => {
   });
 });
 
+describe("TaskAttachments — image previews", () => {
+  it("shows an image as a preview tile using a fresh signed URL", async () => {
+    renderAttachments();
+
+    const img = await screen.findByRole("img", { name: "login-bug.png" });
+    expect(img).toHaveAttribute("src", SIGNED_URL);
+    expect(getAttachmentDownload).toHaveBeenCalledWith(TASK_ID, makeAttachment().id);
+    expect(screen.getByRole("button", { name: "Preview login-bug.png" })).toBeInTheDocument();
+  });
+
+  it("keeps non-image files as plain rows without fetching a preview", async () => {
+    vi.mocked(getTaskAttachments).mockResolvedValue(makePage([makePdf()]));
+    renderAttachments();
+
+    expect(await screen.findByText("product-spec.pdf")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Preview product-spec.pdf" }),
+    ).not.toBeInTheDocument();
+    expect(getAttachmentDownload).not.toHaveBeenCalled();
+  });
+
+  it("opens a larger preview with a download action when the tile is clicked", async () => {
+    const user = userEvent.setup();
+    renderAttachments();
+
+    await user.click(await screen.findByRole("button", { name: "Preview login-bug.png" }));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByRole("img", { name: "login-bug.png" })).toHaveAttribute(
+      "src",
+      SIGNED_URL,
+    );
+    expect(within(dialog).getByRole("button", { name: /download/i })).toBeInTheDocument();
+  });
+
+  it("falls back to a placeholder tile when the signed image fails to load", async () => {
+    renderAttachments();
+
+    fireEvent.error(await screen.findByRole("img", { name: "login-bug.png" }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole("img", { name: "login-bug.png" })).not.toBeInTheDocument(),
+    );
+    // The tile stays usable — preview still opens (and can fetch a fresh URL).
+    expect(screen.getByRole("button", { name: "Preview login-bug.png" })).toBeInTheDocument();
+  });
+});
+
 describe("TaskAttachments — download & delete", () => {
-  it("downloads on the row's download control", async () => {
-    vi.mocked(getAttachmentDownload).mockResolvedValue({
-      url: "https://storage.example.com/x",
-      expires_at: "soon",
+  it("downloads on the tile's download control via a temporary anchor", async () => {
+    const clicked: HTMLAnchorElement[] = [];
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      clicked.push(this);
     });
-    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
     const user = userEvent.setup();
     renderAttachments();
 
     await user.click(await screen.findByRole("button", { name: "Download login-bug.png" }));
 
-    await waitFor(() =>
-      expect(getAttachmentDownload).toHaveBeenCalledWith(TASK_ID, makeAttachment().id),
-    );
+    // The tile's mount-time preview fetch must not trigger any download.
+    await waitFor(() => expect(clicked).toHaveLength(1));
+    expect(clicked[0].getAttribute("download")).toBe("login-bug.png");
   });
 
   it("deletes only after the confirmation dialog is accepted", async () => {
