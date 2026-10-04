@@ -142,6 +142,109 @@ async function request<T>(
   return response.json() as Promise<T>;
 }
 
+interface UploadOptions {
+  signal?: AbortSignal;
+  /** Raw byte counts, straight from the browser's upload progress events. */
+  onProgress?: (loaded: number, total: number) => void;
+}
+
+/**
+ * Multipart POST via XHR — fetch cannot report upload progress. Mirrors
+ * `request`'s semantics: Bearer auth, `HttpError` with the parsed body on a
+ * non-2xx response, and a deduplicated refresh-and-retry on 401. No
+ * Content-Type header — the browser adds the multipart boundary itself.
+ */
+function uploadRequest<T>(path: string, form: FormData, options?: UploadOptions): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    if (options?.signal?.aborted) {
+      reject(new DOMException('The upload was aborted', 'AbortError'));
+      return;
+    }
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${BASE_URL}${path}`);
+    xhr.setRequestHeader('Accept', 'application/json');
+    const token = getCookie('access_token');
+    if (token) {
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    }
+
+    const onSignalAbort = () => xhr.abort();
+    options?.signal?.addEventListener('abort', onSignalAbort);
+    const settle = (finish: () => void) => {
+      options?.signal?.removeEventListener('abort', onSignalAbort);
+      finish();
+    };
+
+    const onProgress = options?.onProgress;
+    if (onProgress) {
+      xhr.upload.addEventListener('progress', (event) => {
+        if (event.lengthComputable) onProgress(event.loaded, event.total);
+      });
+    }
+
+    xhr.addEventListener('load', () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const value =
+            xhr.status === 204 || xhr.responseText === ''
+              ? (undefined as T)
+              : (JSON.parse(xhr.responseText) as T);
+          settle(() => resolve(value));
+        } catch (parseError) {
+          settle(() => reject(parseError));
+        }
+        return;
+      }
+
+      if (xhr.status === 401 && !AUTH_PATHS.includes(path)) {
+        settle(() =>
+          resolve(
+            (async () => {
+              try {
+                // Deduplicate concurrent refresh calls
+                refreshPromise ??= refreshTokens();
+                const data = await refreshPromise;
+                saveTokens(data);
+
+                // Retry with the new token; its own errors propagate untouched.
+                return uploadRequest<T>(path, form, options);
+              } catch {
+                clearTokens();
+                throw new HttpError(401, 'Session expired');
+              } finally {
+                refreshPromise = null;
+              }
+            })(),
+          ),
+        );
+        return;
+      }
+
+      let body: unknown;
+      try {
+        body = xhr.responseText === '' ? undefined : JSON.parse(xhr.responseText);
+      } catch {
+        body = undefined;
+      }
+      settle(() =>
+        reject(new HttpError(xhr.status, `POST ${path} failed with status ${xhr.status}`, body)),
+      );
+    });
+
+    xhr.addEventListener('error', () =>
+      settle(() => reject(new HttpError(0, `POST ${path} failed: network error`))),
+    );
+    xhr.addEventListener('abort', () =>
+      settle(() => reject(new DOMException('The upload was aborted', 'AbortError'))),
+    );
+
+    xhr.send(form);
+  });
+}
+
+export type { UploadOptions };
+
 export const httpClient = {
   get<T>(path: string, signal?: AbortSignal) {
     return request<T>('GET', path, { signal });
@@ -157,5 +260,8 @@ export const httpClient = {
   },
   delete<T>(path: string, body?: unknown) {
     return request<T>('DELETE', path, { body });
+  },
+  upload<T>(path: string, form: FormData, options?: UploadOptions) {
+    return uploadRequest<T>(path, form, options);
   },
 };

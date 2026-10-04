@@ -10,6 +10,7 @@ import { useUpdateTaskLabels } from "./hooks/use-update-task-labels";
 import TaskDetailHeader from "./task-detail-header";
 import TaskDetailDescription from "./task-detail-description";
 import TaskDetailSidebar from "./task-detail-sidebar";
+import TaskAttachments from "./attachments";
 import Subtask from "./subtask";
 import Activity from "./activity";
 
@@ -134,6 +135,7 @@ export default function TaskDetail() {
           parent={task.parent}
         />
         <TaskDetailDescription key={task.id} id={task.id} description={task.description} />
+        <TaskAttachments taskId={task.id} ticketId={task.ticket_id} projectId={projectId} />
         <Subtask taskId={task.id} teamId={task.creator?.team_id ?? 0} />
         <Activity taskId={task.id} />
       </div>
