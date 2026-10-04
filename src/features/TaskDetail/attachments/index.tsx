@@ -39,8 +39,13 @@ export default function TaskAttachments({
   projectId,
 }: Readonly<TaskAttachmentsProps>) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Each dialog splits its open flag from its subject: Radix keeps a closing
+  // dialog mounted through the exit animation, so nulling the subject on
+  // close would blank the content (loading flash) while it fades out.
   const [pendingDelete, setPendingDelete] = useState<ITaskAttachment | null>(null);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [previewAttachment, setPreviewAttachment] = useState<ITaskAttachment | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const dragDepthRef = useRef(0);
 
@@ -106,11 +111,21 @@ export default function TaskAttachments({
     }
   };
 
+  const openPreview = (attachment: ITaskAttachment) => {
+    setPreviewAttachment(attachment);
+    setIsPreviewOpen(true);
+  };
+
+  const requestDelete = (attachment: ITaskAttachment) => {
+    setPendingDelete(attachment);
+    setIsDeleteConfirmOpen(true);
+  };
+
   const confirmDelete = () => {
     if (!pendingDelete) return;
     deleteAttachment.mutate(
       { taskId, attachmentId: pendingDelete.id },
-      { onSuccess: () => setPendingDelete(null) },
+      { onSuccess: () => setIsDeleteConfirmOpen(false) },
     );
   };
 
@@ -218,9 +233,9 @@ export default function TaskAttachments({
               canDelete={canDeleteAttachment(attachment)}
               isDownloading={isDownloadingAttachment(attachment)}
               isDeleting={isDeletingAttachment(attachment)}
-              onPreview={() => setPreviewAttachment(attachment)}
+              onPreview={() => openPreview(attachment)}
               onDownload={() => startDownload(attachment)}
-              onRequestDelete={() => setPendingDelete(attachment)}
+              onRequestDelete={() => requestDelete(attachment)}
             />
           ))}
         </div>
@@ -236,7 +251,7 @@ export default function TaskAttachments({
               isDownloading={isDownloadingAttachment(attachment)}
               isDeleting={isDeletingAttachment(attachment)}
               onDownload={() => startDownload(attachment)}
-              onRequestDelete={() => setPendingDelete(attachment)}
+              onRequestDelete={() => requestDelete(attachment)}
             />
           ))}
         </div>
@@ -323,9 +338,9 @@ export default function TaskAttachments({
       )}
 
       <Dialog
-        open={previewAttachment !== null}
+        open={isPreviewOpen}
         onOpenChange={(open) => {
-          if (!open) setPreviewAttachment(null);
+          if (!open) setIsPreviewOpen(false);
         }}
       >
         <DialogContent className="sm:max-w-3xl">
@@ -365,9 +380,9 @@ export default function TaskAttachments({
       </Dialog>
 
       <Dialog
-        open={pendingDelete !== null}
+        open={isDeleteConfirmOpen}
         onOpenChange={(open) => {
-          if (!open && !deleteAttachment.isPending) setPendingDelete(null);
+          if (!open && !deleteAttachment.isPending) setIsDeleteConfirmOpen(false);
         }}
       >
         <DialogContent className="sm:max-w-[420px]">
@@ -382,7 +397,7 @@ export default function TaskAttachments({
               type="button"
               variant="outline"
               disabled={deleteAttachment.isPending}
-              onClick={() => setPendingDelete(null)}
+              onClick={() => setIsDeleteConfirmOpen(false)}
             >
               Cancel
             </Button>
