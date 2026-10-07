@@ -36,10 +36,14 @@ export default function UploadQueue({
   if (items.length === 0) return null;
 
   return (
-    <div
-      aria-live="polite"
-      className="mb-3 divide-y divide-border overflow-hidden rounded-lg border border-border bg-card"
-    >
+    // No aria-live wrapper: it would announce every progress tick. Progress is
+    // conveyed by the progressbar roles; failures announce via role="alert".
+    <div className="mb-3 divide-y divide-border overflow-hidden rounded-lg border border-border bg-card">
+      {uploadingCount ? (
+        <span role="status" className="sr-only">
+          {uploadingCount === 1 ? "1 upload in progress" : `${uploadingCount} uploads in progress`}
+        </span>
+      ) : null}
       {uploadingCount >= 2 ? (
         <div className="flex items-center justify-between gap-2 bg-muted/50 px-3 py-1.5">
           <span className="text-xs font-medium text-muted-foreground">

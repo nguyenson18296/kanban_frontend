@@ -203,6 +203,94 @@ describe("httpClient.upload", () => {
     await expect(promise).resolves.toEqual({ id: "a1" });
   });
 
+  it("rejects with AbortError without creating an XHR when the signal is already aborted", async () => {
+    const controller = new AbortController();
+    controller.abort();
+
+    const error = await httpClient
+      .upload(PATH, new FormData(), { signal: controller.signal })
+      .then(
+        () => null,
+        (caught: unknown) => caught,
+      );
+
+    expect((error as DOMException).name).toBe("AbortError");
+    expect(FakeXHR.instances).toHaveLength(0);
+  });
+
+  it("rejects with AbortError and sends no retry when aborted during the token refresh", async () => {
+    document.cookie = "refresh_token=refTok; path=/";
+    const newJwt = fakeJwt(Math.floor(Date.now() / 1000) + 3600);
+    let releaseRefresh: () => void = () => {};
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            releaseRefresh = () =>
+              resolve({
+                ok: true,
+                json: () => Promise.resolve({ access_token: newJwt, refresh_token: "o2" }),
+              });
+          }),
+      ),
+    );
+    const controller = new AbortController();
+
+    const promise = httpClient.upload(PATH, new FormData(), { signal: controller.signal });
+    lastXhr().respond(401, { message: "Unauthorized", statusCode: 401 });
+    // The XHR already settled — only the retry's entry check can see this abort.
+    controller.abort();
+    releaseRefresh();
+
+    const error = await promise.then(
+      () => null,
+      (caught: unknown) => caught,
+    );
+    expect((error as DOMException).name).toBe("AbortError");
+    expect(FakeXHR.instances).toHaveLength(1);
+  });
+
+  it("resolves undefined for a 2xx response with an empty body", async () => {
+    const promise = httpClient.upload(PATH, new FormData());
+    lastXhr().respond(204);
+    await expect(promise).resolves.toBeUndefined();
+  });
+
+  it("rejects when a 2xx response carries unparseable JSON", async () => {
+    const promise = httpClient.upload(PATH, new FormData());
+    const xhr = lastXhr();
+    xhr.status = 200;
+    xhr.responseText = "not json";
+    xhr.emit("load");
+    await expect(promise).rejects.toBeInstanceOf(SyntaxError);
+  });
+
+  it("surfaces a 401 from the retried upload instead of refreshing a second time", async () => {
+    document.cookie = "refresh_token=refTok; path=/";
+    const newJwt = fakeJwt(Math.floor(Date.now() / 1000) + 3600);
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ access_token: newJwt, refresh_token: "opaque2" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const promise = httpClient.upload(PATH, new FormData());
+    lastXhr().respond(401, { message: "Unauthorized", statusCode: 401 });
+    await vi.waitFor(() => expect(FakeXHR.instances).toHaveLength(2));
+    lastXhr().respond(401, { message: "Unauthorized", statusCode: 401 });
+
+    const error = await promise.then(
+      () => null,
+      (caught: unknown) => caught,
+    );
+    expect(error).toBeInstanceOf(HttpError);
+    expect((error as HttpError).status).toBe(401);
+    // One refresh per upload — a 10 MB body must not loop through the network.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(FakeXHR.instances).toHaveLength(2);
+  });
+
   it("clears tokens and rejects with 401 Session expired when the refresh fails", async () => {
     document.cookie = "refresh_token=refTok; path=/";
     vi.stubGlobal(

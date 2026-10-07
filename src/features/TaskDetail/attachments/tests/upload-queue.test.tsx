@@ -82,6 +82,14 @@ describe("UploadQueue", () => {
     ).toBeInTheDocument();
   });
 
+  it("announces upload activity once via a status region, not per progress tick", () => {
+    renderQueue([makeItem()], 1);
+
+    expect(screen.getByRole("status")).toHaveTextContent("1 upload in progress");
+    // No broad live region — it would announce every percent change.
+    expect(document.querySelector("[aria-live]")).toBeNull();
+  });
+
   it("offers Cancel all only while several files are uploading", async () => {
     const user = userEvent.setup();
     const { rerender } = renderQueue(

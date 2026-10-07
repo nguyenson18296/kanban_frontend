@@ -18,14 +18,15 @@ import type { ITaskAttachment } from "@/types";
 import AttachmentRow from "./attachment-row";
 import AttachmentTile from "./attachment-tile";
 import UploadQueue from "./upload-queue";
-import { formatBytes } from "./file-rules";
+import { MAX_ATTACHMENT_BYTES, formatBytes } from "./file-rules";
 import { useAttachmentPreview } from "./hooks/use-attachment-preview";
 import { useDeleteAttachment } from "./hooks/use-delete-attachment";
 import { useDownloadAttachment } from "./hooks/use-download-attachment";
 import { useTaskAttachments } from "./hooks/use-task-attachments";
 import { useUploadQueue } from "./hooks/use-upload-queue";
 
-const DROPZONE_HINT = "up to 10 MB";
+// Derived from the validator's limit so the copy can never drift from it.
+const DROPZONE_HINT = `up to ${formatBytes(MAX_ATTACHMENT_BYTES)}`;
 
 interface TaskAttachmentsProps {
   taskId: string;
@@ -88,14 +89,27 @@ export default function TaskAttachments({
       dragDepthRef.current = 0;
       setIsDraggingFile(false);
     };
+    // Safety net: a file drop the overlay doesn't catch (it can sit under a
+    // Radix dialog portal, which also sets pointer-events: none on body)
+    // would otherwise navigate the tab to the file. Gated on Files so text
+    // and link drags stay native.
+    const onDragOver = (event: DragEvent) => {
+      if (hasFiles(event)) event.preventDefault();
+    };
+    const onDrop = (event: DragEvent) => {
+      if (hasFiles(event)) event.preventDefault();
+      reset();
+    };
     document.addEventListener("dragenter", onDragEnter);
     document.addEventListener("dragleave", onDragLeave);
-    document.addEventListener("drop", reset);
+    document.addEventListener("dragover", onDragOver);
+    document.addEventListener("drop", onDrop);
     document.addEventListener("dragend", reset);
     return () => {
       document.removeEventListener("dragenter", onDragEnter);
       document.removeEventListener("dragleave", onDragLeave);
-      document.removeEventListener("drop", reset);
+      document.removeEventListener("dragover", onDragOver);
+      document.removeEventListener("drop", onDrop);
       document.removeEventListener("dragend", reset);
     };
   }, []);

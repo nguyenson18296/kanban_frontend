@@ -1,5 +1,6 @@
 import { renderHook, waitFor } from "@testing-library/react";
 import { act } from "react";
+import { toast } from "sonner";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useUploadQueue } from "../hooks/use-upload-queue";
@@ -9,6 +10,7 @@ import type { ITaskAttachment } from "@/types";
 import { TASK_ID, createQueryWrapper, makeAttachment } from "./test-utils";
 
 vi.mock("@/services/attachment.service");
+vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
 
 interface PendingUpload {
   file: File;
@@ -140,6 +142,65 @@ describe("useUploadQueue", () => {
 
     expect(pending[0].signal?.aborted).toBe(true);
     await waitFor(() => expect(result.current.items).toHaveLength(0));
+  });
+
+  it("keeps progress at zero when the browser reports an unknown total", async () => {
+    const { result } = setup();
+
+    await act(async () => result.current.addFiles([png()]));
+    act(() => pending[0].onProgress?.(10, 0));
+
+    expect(result.current.items[0].progress).toBe(0);
+  });
+
+  it("ignores retry on an item that is still uploading — no duplicate request", async () => {
+    const { result } = setup();
+
+    await act(async () => result.current.addFiles([png()]));
+    await act(async () => result.current.retryUpload(result.current.items[0].localId));
+
+    expect(uploadTaskAttachment).toHaveBeenCalledTimes(1);
+    expect(result.current.items[0].status).toBe("uploading");
+  });
+
+  it("dismiss aborts an in-flight upload before removing it", async () => {
+    const { result } = setup();
+
+    await act(async () => result.current.addFiles([png()]));
+    await act(async () => result.current.dismissUpload(result.current.items[0].localId));
+
+    expect(pending[0].signal?.aborted).toBe(true);
+    await waitFor(() => expect(result.current.items).toHaveLength(0));
+  });
+
+  it("toasts a failure that lands after unmount instead of dying silently", async () => {
+    const { result, unmount } = setup();
+    await act(async () => result.current.addFiles([png("late.png")]));
+
+    unmount();
+    act(() =>
+      pending[0].reject(
+        new HttpError(503, "POST /x failed with status 503", {
+          statusCode: 503,
+          message: "File storage is unavailable, please try again",
+        }),
+      ),
+    );
+
+    await vi.waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith("File storage is unavailable, please try again"),
+    );
+  });
+
+  it("stays silent when an abort lands after unmount", async () => {
+    const { result, unmount } = setup();
+    await act(async () => result.current.addFiles([png()]));
+
+    unmount();
+    act(() => pending[0].reject(new DOMException("The upload was aborted", "AbortError")));
+    await act(async () => {});
+
+    expect(toast.error).not.toHaveBeenCalled();
   });
 
   it("uploads several files in parallel — one request each — and cancelAll aborts them all", async () => {

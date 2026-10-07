@@ -383,4 +383,41 @@ describe("TaskAttachments — drag and drop", () => {
 
     expect(screen.queryByTestId("attachment-drop-overlay")).not.toBeInTheDocument();
   });
+
+  it("keeps the overlay up while dragging across nested elements", async () => {
+    renderAttachments();
+    await screen.findByText("login-bug.png");
+
+    // Entering a child fires another dragenter before the parent's dragleave.
+    fireEvent.dragEnter(document.body, { dataTransfer: { types: ["Files"], files: [] } });
+    fireEvent.dragEnter(document.body, { dataTransfer: { types: ["Files"], files: [] } });
+    fireEvent.dragLeave(document.body, { dataTransfer: { types: ["Files"], files: [] } });
+    expect(screen.getByTestId("attachment-drop-overlay")).toBeInTheDocument();
+
+    fireEvent.dragLeave(document.body, { dataTransfer: { types: ["Files"], files: [] } });
+    expect(screen.queryByTestId("attachment-drop-overlay")).not.toBeInTheDocument();
+  });
+
+  it("prevents the browser's default file-drop navigation anywhere in the document", async () => {
+    renderAttachments();
+    await screen.findByText("login-bug.png");
+
+    // fireEvent returns false when preventDefault was called.
+    const fileDragOver = fireEvent.dragOver(document.body, {
+      dataTransfer: { types: ["Files"], files: [] },
+    });
+    const fileDrop = fireEvent.drop(document.body, {
+      dataTransfer: { types: ["Files"], files: [png("stray.png")] },
+    });
+
+    expect(fileDragOver).toBe(false);
+    expect(fileDrop).toBe(false);
+    // A stray drop is neutralized, never uploaded.
+    expect(uploadTaskAttachment).not.toHaveBeenCalled();
+
+    // Text drags stay native — the comment editor's drops must not break.
+    expect(
+      fireEvent.dragOver(document.body, { dataTransfer: { types: ["text/plain"], files: [] } }),
+    ).toBe(true);
+  });
 });

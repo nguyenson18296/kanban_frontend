@@ -154,7 +154,12 @@ interface UploadOptions {
  * non-2xx response, and a deduplicated refresh-and-retry on 401. No
  * Content-Type header — the browser adds the multipart boundary itself.
  */
-function uploadRequest<T>(path: string, form: FormData, options?: UploadOptions): Promise<T> {
+function uploadRequest<T>(
+  path: string,
+  form: FormData,
+  options?: UploadOptions,
+  isRetry = false,
+): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     if (options?.signal?.aborted) {
       reject(new DOMException('The upload was aborted', 'AbortError'));
@@ -197,7 +202,9 @@ function uploadRequest<T>(path: string, form: FormData, options?: UploadOptions)
         return;
       }
 
-      if (xhr.status === 401 && !AUTH_PATHS.includes(path)) {
+      // One refresh per upload (unlike the fetch path): a looping 401 would
+      // re-send the full multipart body — up to 10 MB — every cycle.
+      if (xhr.status === 401 && !isRetry && !AUTH_PATHS.includes(path)) {
         settle(() =>
           resolve(
             (async () => {
@@ -208,7 +215,7 @@ function uploadRequest<T>(path: string, form: FormData, options?: UploadOptions)
                 saveTokens(data);
 
                 // Retry with the new token; its own errors propagate untouched.
-                return uploadRequest<T>(path, form, options);
+                return uploadRequest<T>(path, form, options, true);
               } catch {
                 clearTokens();
                 throw new HttpError(401, 'Session expired');

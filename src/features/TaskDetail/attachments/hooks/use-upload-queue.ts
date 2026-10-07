@@ -1,6 +1,6 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
-import { serverMessage } from "@/lib/toast-error";
+import { serverMessage, toastError } from "@/lib/toast-error";
 import { validateAttachmentFile } from "../file-rules";
 import { useUploadAttachment } from "./use-upload-attachment";
 
@@ -39,6 +39,16 @@ export function useUploadQueue(taskId: string) {
   // settlements of parallel uploads. The returned promise settles per call.
   const { mutateAsync: uploadMutation } = useUploadAttachment();
 
+  // Uploads keep running after unmount (navigating away must not kill them),
+  // but once the inline queue UI is gone a failure needs another channel.
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   const patchItem = (localId: string, patch: Partial<UploadQueueItem>) => {
     setItems((prev) =>
       prev.map((item) => (item.localId === localId ? { ...item, ...patch } : item)),
@@ -64,6 +74,11 @@ export function useUploadQueue(taskId: string) {
       // The list was already invalidated (and awaited) by the upload hook.
       .then(() => removeItem(localId))
       .catch((error: unknown) => {
+        if (!mountedRef.current) {
+          // Writes never fail silently — fall back to a toast post-unmount.
+          if (!isAbort(error)) toastError(error, `Couldn't upload ${file.name}`);
+          return;
+        }
         if (isAbort(error)) {
           removeItem(localId);
           return;
@@ -93,10 +108,15 @@ export function useUploadQueue(taskId: string) {
     }
   };
 
-  /** Re-send a failed item's file; rejected items have nothing to retry. */
+  /**
+   * Re-send a failed item's file. The hook owns the state machine: rejected
+   * items have nothing to retry, and retrying an item that is still uploading
+   * would post a duplicate attachment — guard here, not just in the markup.
+   */
   const retryUpload = (localId: string) => {
     const entry = inFlightRef.current.get(localId);
-    if (!entry) return;
+    const item = items.find((queued) => queued.localId === localId);
+    if (!entry || item?.status !== "failed") return;
     patchItem(localId, { status: "uploading", progress: 0, message: undefined });
     startUpload(localId, entry.file);
   };
@@ -105,7 +125,11 @@ export function useUploadQueue(taskId: string) {
     inFlightRef.current.get(localId)?.controller.abort();
   };
 
-  const dismissUpload = removeItem;
+  const dismissUpload = (localId: string) => {
+    // No-op for settled uploads; stops the XHR if one is somehow in flight.
+    inFlightRef.current.get(localId)?.controller.abort();
+    removeItem(localId);
+  };
 
   const cancelAll = () => {
     for (const item of items) {
