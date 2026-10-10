@@ -8,8 +8,10 @@ import { HttpError } from "./http-client";
  * (`"POST /path failed with status 400"`), so the human-readable message —
  * when present — lives in `HttpError.body`, which the API returns as
  * `{ statusCode, message }` (`message` may be a string or a string[]).
+ * Exported for surfaces that render errors inline instead of toasting
+ * (e.g. the attachment upload queue).
  */
-function serverMessage(error: unknown): string | undefined {
+export function serverMessage(error: unknown): string | undefined {
   if (!(error instanceof HttpError) || typeof error.body !== "object" || error.body === null) {
     return undefined;
   }
